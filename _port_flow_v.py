@@ -21,7 +21,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.optimize import minimize_scalar
 from tkinter.filedialog import askopenfilename
 
-ver = "1.0a"
+ver = "1.0b"
 
 cc_to_ci = np.float64(0.0610237441)
 ci_to_cc = np.float64(16.387064069264)
@@ -179,14 +179,27 @@ def generate_flow(resolution, port_to_valve_ratio, head_dia, lift, saturated_l, 
     lifts = np.arange(lift / resolution, lift * 2, lift / resolution)[:resolution]
     curtains = head_dia * port_to_valve_ratio * np.pi * lifts
     coeffs = 1 + np.log(saturated_l / lifts) / linearity
-    coeffs[lifts > saturated_l] = 1 / (lifts[lifts > saturated_l] / saturated_l) + (lifts[lifts > saturated_l] - saturated_l) * 0.05 / np.arange(1, np.sum(lifts > saturated_l) + 0.03)
+    coeffs[lifts > saturated_l] = 1 / (lifts[lifts > saturated_l] / saturated_l) + (lifts[lifts > saturated_l] - saturated_l) * 0.05 / np.arange(1, np.sum(lifts > saturated_l) + 1)
     flow_samples = curtains / factor * coeffs * num_valves
     flow_samples_with_zero = np.insert(flow_samples, 0, 0)
+    
     pad_size = 10
+    
+    def linear_extrapolation(arr, num_points):
+        x = np.arange(len(arr))
+        y = arr
+        slope, intercept = np.polyfit(x[-num_points:], y[-num_points:], 1)
+        x_extrap = np.arange(len(arr), len(arr) + pad_size)
+        return slope * x_extrap + intercept
+
+    extrapolated_values = linear_extrapolation(flow_samples_with_zero, num_points=5)
     padded_flow_samples = np.pad(flow_samples_with_zero, (pad_size, 0), 'reflect', reflect_type='odd')
+    padded_flow_samples = np.append(padded_flow_samples, extrapolated_values)
+    
     smooth_flow_samples_padded = gaussian_filter1d(padded_flow_samples, sigma=smoothness)
-    smooth_flow_samples = smooth_flow_samples_padded[pad_size:]
+    smooth_flow_samples = smooth_flow_samples_padded[pad_size:pad_size + len(flow_samples_with_zero)]
     smooth_flow_samples[0] = 0
+    
     # lifts = lifts / 25.4
     return np.insert(lifts, 0, 0), smooth_flow_samples
 
@@ -484,6 +497,8 @@ def port_flow(fpath):
 
                 p_es_blocks = regex.compile(r"\{[^{}]* exhaust_system [^{}]*\}")
                 es_blocks = p_es_blocks.findall(file_contents, regex.DOTALL)
+                if len(es_blocks) == 0:
+                    raise ValueError("could not find engine blocks")
 
                 es_replacements = []
 
