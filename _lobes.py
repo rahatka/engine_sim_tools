@@ -190,7 +190,7 @@ def create_profile(duration, lift, trim_factor, sigma, vol, res, at_lift, ramp_s
         min_index = np.argmax(y > 0)
         min_index = min_index if min_index == 0 else min_index - 1
         restored_space = np.linspace(x[min_index], 0, res // 2)
-        f = interp1d(x[min_index:], y[min_index:], kind='cubic', fill_value="extrapolate")
+        f = interp1d(x[min_index:], y[min_index:], kind='cubic', fill_value='extrapolate')
         restored_values = f(restored_space)
         return restored_space, restored_values
 
@@ -199,7 +199,7 @@ def create_profile(duration, lift, trim_factor, sigma, vol, res, at_lift, ramp_s
         s_y = min_max_scale_array(1 / (1 + np.exp(-x + ramp_pos)))
         lifts_lt_at = np.sum(arr < at_lift)
         s_x = scale_abs(x + steepness, lifts_lt_at)
-        f = interp1d(s_x, s_y, kind='cubic', fill_value="extrapolate")
+        f = interp1d(s_x, s_y, kind='cubic', fill_value='extrapolate')
         indices = np.arange(lifts_lt_at)
         interpolated_values = f(indices)
         potential_lift = arr[:lifts_lt_at] * interpolated_values
@@ -305,6 +305,8 @@ def plot_all(ax, fpath, cfg, int_lift, exh_lift, ivo, ivc, evo, evc):
     ax.text(0.05, 0.08,
              f'{os.path.basename(fpath)}\nIVO IVC: {ivo} {ivc}\nEVO EVC: {evo} {evc}'
              f'\nLSA: {i_c - e_c:.2f}\nadvance: {-e_c - i_c:.2f}\noverlap: {ivo + evc:.1f}\nbase intake formula: {i_formula}\nbase exhaust formula: {e_formula}'
+             f'\nintake lift: {int_lift:.2f} mm ({int_lift * 0.03937:.3f}″)'
+             f'\nexhaust lift: {exh_lift:.2f} mm ({exh_lift * 0.03937:.3f}″)'
              f'\nadvertised intake duration: {i_adv_dur:.1f}\nadvertised exhaust duration: {e_adv_dur:.1f}'
              f'\nintake duration: {int_dur:.1f} @ {cfg["intake_at_lift"]:.3f} mm ({cfg["intake_at_lift"] * 0.03937:.3f}″)'
              f'\nexhaust duration: {exh_dur:.1f} @ {cfg["exhaust_at_lift"]:.3f} mm ({cfg["exhaust_at_lift"] * 0.03937:.3f}″)'

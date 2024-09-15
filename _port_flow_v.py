@@ -21,7 +21,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.optimize import minimize_scalar
 from tkinter.filedialog import askopenfilename
 
-ver = "1.0b"
+ver = "1.3"
 
 cc_to_ci = np.float64(0.0610237441)
 ci_to_cc = np.float64(16.387064069264)
@@ -35,6 +35,12 @@ def draw_circle(ax, center, radius, color='blue', linestyle='-'):
 def setup_ax(ax):
     ax.grid(color='dimgrey', linewidth=0.3)
     ax.tick_params(colors='darkgrey')
+
+def remove_ticks_labels(ax):
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
 
 def round_floats(o):
     if isinstance(o, float):
@@ -132,17 +138,18 @@ def mm_to_inches_fraction(mm):
 
 def parse_cfg(fpath):
     cfg = {
-        "es_version": "0.1.14a",
         "resolution": 32,
         "power_factor": 1.0,
         "max_power_rpm": None,
         "max_torque_rpm": None,
         "port_to_valve_area": 0.88,
-        "valve_to_stem_dia": 5.5,
+        "valve_to_stem_dia": 5.0,
         "intake_runner_dia_mult": 1.0,
         "ir_to_er_ratio": 3.0,
         "exhaust_flange_dia": None,
-        "smoothness": 3.3,
+        "primary_area_coeff": 1.1,
+        "collector_area_coeff": 0.3,
+        "smoothness": 2.0,
     }
 
     comments = comment_parser.extract_comments(fpath, mime='text/x-c')
@@ -227,6 +234,8 @@ def port_flow(fpath):
     ax2 = plt.subplot(4, 2, 4)
     ax3 = plt.subplot(2, 2, 4)
     setup_ax(ax)
+    remove_ticks_labels(ax2)
+
     cf = pylab.gcf()
     cf.canvas.manager.set_window_title(os.path.basename(fpath).split('.')[0])
 
@@ -290,6 +299,8 @@ def port_flow(fpath):
     allowed_irdm = np.linspace(0.8, 1.2, 21)
     allowed_irerr = np.linspace(1.0, 5.0, 41)
     allowed_smooth = np.linspace(1.0, 5.0, 41)
+    allowed_pac = np.linspace(0.5, 1.5, 21)
+    allowed_cac = np.linspace(0.1, 1.0, 19)
 
     left_sliders = 0.75
     ax_i_pf = plt.axes([left_sliders, 0.92, 0.2, 0.03])
@@ -302,37 +313,23 @@ def port_flow(fpath):
     slider_i_irdm  = Slider(ax=ax_i_irdm, label='intake runner dia mult', valmin=0.8, valmax=1.2, valstep=allowed_irdm, valinit=cfg["intake_runner_dia_mult"], color='skyblue')
     ax_i_irerr = plt.axes([left_sliders, 0.84, 0.2, 0.03])
     slider_i_irerr  = Slider(ax=ax_i_irerr, label='intake to exhaust runner ratio', valmin=1.0, valmax=5.0, valstep=allowed_irerr, valinit=cfg["ir_to_er_ratio"], color='skyblue')
-    ax_i_smooth = plt.axes([left_sliders, 0.82, 0.2, 0.03])
+    ax_i_pac = plt.axes([left_sliders, 0.82, 0.2, 0.03])
+    slider_i_pac  = Slider(ax=ax_i_pac, label='primary area coeff', valmin=0.5, valmax=1.5, valstep=allowed_pac, valinit=cfg["primary_area_coeff"], color='skyblue')
+    ax_i_cac = plt.axes([left_sliders, 0.80, 0.2, 0.03])
+    slider_i_cac  = Slider(ax=ax_i_cac, label='collector area coeff', valmin=0.1, valmax=1.0, valstep=allowed_cac, valinit=cfg["collector_area_coeff"], color='skyblue')
+    ax_i_smooth = plt.axes([left_sliders, 0.78, 0.2, 0.03])
     slider_i_smooth  = Slider(ax=ax_i_smooth, label='smoothness', valmin=1.0, valmax=5.0, valstep=allowed_smooth, valinit=cfg["smoothness"], color='skyblue')
 
-    ax_save = fig.add_axes([left_sliders, 0.78, 0.12, 0.03])
+    ax_save = fig.add_axes([left_sliders, 0.74, 0.12, 0.03])
     button_save = Button(ax_save, 'save', color='black', hovercolor='skyblue')
+
+    bore_area = quarter_pi * bore ** 2
+    int_valve_head_area = quarter_pi * int_head_dia ** 2
+    exh_valve_head_area = quarter_pi * exh_head_dia ** 2
 
     def plot_all():
         nonlocal c
-        ax.plot(c.int_l, c.int_f, color='skyblue')
-        ax.plot(c.exh_l, c.exh_f, color='orange')
-        ax.vlines(x=max(c.int_l), ymin=0, ymax=max(c.int_f), linestyle='--', colors='skyblue', linewidth=0.5)
-        ax.hlines(y=max(c.int_f), xmin=0, xmax=max(c.int_l), linestyle='--', colors='skyblue', linewidth=0.5)
-        ax.vlines(x=max(c.exh_l), ymin=0, ymax=max(c.exh_f), linestyle='--', colors='orange', linewidth=0.5)
-        ax.hlines(y=max(c.exh_f), xmin=0, xmax=max(c.exh_l), linestyle='--', colors='orange', linewidth=0.5)
 
-        ax2.axis([0, 10, 0, 8])
-        ax2.text(0.2, 7.0, f'bore x stroke {bore} x {stroke}', fontsize=8)
-        ax2.text(9.8, 7.0, f'{mm_to_inches_fraction(bore)} x {mm_to_inches_fraction(stroke)}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 6.0, f'intake valve  {int_head_dia} : {int_lift}', fontsize=8)
-        ax2.text(9.8, 6.0, f'{mm_to_inches_fraction(int_head_dia)} : {mm_to_inches_fraction(int_lift)}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 5.0, f'exhaust valve {exh_head_dia} : {exh_lift}', fontsize=8)
-        ax2.text(9.8, 5.0, f'{mm_to_inches_fraction(exh_head_dia)} : {mm_to_inches_fraction(exh_lift)}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 4.0, f'flow rates    {c.ifr:.2f} {c.efr:.2f}', fontsize=8)
-        ax2.text(9.8, 4.0, f'ir_fr / ep_fr {c.i_runner_fr:.2f} {c.e_primary_fr:.2f}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 3.0, f'saturated l   {c.int_saturated_lift:.2f} {c.exh_saturated_lift:.2f}', fontsize=8)
-        ax2.text(0.2, 2.0, f'ir_v / er_v   {c.ir_volume:.2f} {c.er_volume:.2f}', fontsize=8)
-        ax2.text(9.8, 2.0, f'ir_l / er_l   {c.runner_l:.2f} {c.primary_l:.2f}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 1.0, f'volume        {c.engine_volume_l:.2f}', fontsize=8)
-        ax2.text(9.8, 1.0, f'{c.engine_volume_l * 1000 / ci_to_cc:.1f}', fontsize=8, horizontalalignment='right')
-
-        ax3.axis([0, 10, 0, 10])
         bore_radius = bore / 2
         intake_radius = int_head_dia / 2
         exhaust_radius = exh_head_dia / 2
@@ -340,6 +337,35 @@ def port_flow(fpath):
         exh_stem_radius = exhaust_radius / cfg["valve_to_stem_dia"]
         int_port_radius = np.sqrt(((np.pi * intake_radius**2) * cfg["port_to_valve_area"]) / np.pi)
         exh_port_radius = np.sqrt(((np.pi * exhaust_radius**2) * cfg["port_to_valve_area"]) / np.pi)
+        int_port_radius_in = int_port_radius / 25.4
+        exh_port_radius_in = exh_port_radius / 25.4
+
+        ax.plot(c.int_l, c.int_f, color='skyblue')
+        ax.plot(c.exh_l, c.exh_f, color='orange')
+        ax.vlines(x=max(c.int_l), ymin=0, ymax=max(c.int_f), linestyle='--', colors='skyblue', linewidth=0.5)
+        ax.hlines(y=max(c.int_f), xmin=0, xmax=max(c.int_l), linestyle='--', colors='skyblue', linewidth=0.5)
+        ax.vlines(x=max(c.exh_l), ymin=0, ymax=max(c.exh_f), linestyle='--', colors='orange', linewidth=0.5)
+        ax.hlines(y=max(c.exh_f), xmin=0, xmax=max(c.exh_l), linestyle='--', colors='orange', linewidth=0.5)
+
+        ax2.axis([0, 10, 0, 9])
+        ax2.text(0.2, 8.0, f'bore x stroke {bore} x {stroke}', fontsize=8)
+        ax2.text(9.8, 8.0, f'{mm_to_inches_fraction(bore)} x {mm_to_inches_fraction(stroke)}', fontsize=8, horizontalalignment='right')
+        ax2.text(0.2, 7.0, f'intake valve {int_head_dia} : {int_lift}', fontsize=8)
+        ax2.text(9.8, 7.0, f'{mm_to_inches_fraction(int_head_dia)} : {mm_to_inches_fraction(int_lift)}', fontsize=8, horizontalalignment='right')
+        ax2.text(0.2, 6.0, f'exhaust valve {exh_head_dia} : {exh_lift}', fontsize=8)
+        ax2.text(9.8, 6.0, f'{mm_to_inches_fraction(exh_head_dia)} : {mm_to_inches_fraction(exh_lift)}', fontsize=8, horizontalalignment='right')
+        ax2.text(0.2, 5.0, f'pr_d / col_d {c.primary_d:.2f} {c.collector_d:.2f}', fontsize=8)
+        ax2.text(9.8, 5.0, f'ir_fr / ep_fr {c.i_runner_fr:.2f} {c.e_primary_fr:.2f}', fontsize=8, horizontalalignment='right')
+        ax2.text(0.2, 4.0, f'saturated l {c.int_saturated_lift:.2f} {c.exh_saturated_lift:.2f}', fontsize=8)
+        ax2.text(9.8, 4.0, f'cr_l / cs_r {mm_to_inches_fraction(crl)} {crl/stroke:.2f}', fontsize=8, horizontalalignment='right')
+        ax2.text(0.2, 3.0, f'ir_v / er_v {c.ir_volume:.2f} {c.er_volume:.2f}', fontsize=8)
+        ax2.text(9.8, 3.0, f'ir_l / er_l {c.runner_l:.2f} {c.primary_l:.2f}', fontsize=8, horizontalalignment='right')
+        ax2.text(0.2, 2.0, f'int_a / exh_a {int_valve_head_area * int_num / bore_area * 100:.1f} {exh_valve_head_area * exh_num / bore_area * 100:.1f}', fontsize=8)
+        ax2.text(9.8, 2.0, f'i_cd / e_cd {int_port_radius * 2:.2f} {exh_port_radius * 2:.2f} : {int_port_radius_in * 2:.2f} {exh_port_radius_in * 2:.2f}', fontsize=8, horizontalalignment='right')
+        ax2.text(0.2, 1.0, f'volume        {c.engine_volume_l:.2f}', fontsize=8)
+        ax2.text(9.8, 1.0, f'{c.engine_volume_l * 1000 / ci_to_cc:.1f}', fontsize=8, horizontalalignment='right')
+
+        ax3.axis([0, 10, 0, 10])
         ax3.set_aspect('equal')
         draw_circle(ax3, (0, 0), bore_radius, 'white')
         total_valve_width = intake_radius + exhaust_radius
@@ -363,11 +389,11 @@ def port_flow(fpath):
         port_to_valve_head_radius = np.sqrt(cfg["port_to_valve_area"])
 
         int_stem_area = quarter_pi * (int_head_dia / cfg["valve_to_stem_dia"]) ** 2
-        c.int_port_area = quarter_pi * int_head_dia ** 2 * cfg["port_to_valve_area"] - int_stem_area
+        c.int_port_area = int_valve_head_area * cfg["port_to_valve_area"] - int_stem_area
         c.int_saturated_lift = c.int_port_area / (int_head_dia * port_to_valve_head_radius * np.pi)
 
         exh_stem_area = quarter_pi * (exh_head_dia / cfg["valve_to_stem_dia"]) ** 2
-        c.exh_port_area = quarter_pi * exh_head_dia ** 2 * cfg["port_to_valve_area"] - exh_stem_area
+        c.exh_port_area = exh_valve_head_area * cfg["port_to_valve_area"] - exh_stem_area
         c.exh_saturated_lift = c.exh_port_area / (exh_head_dia * port_to_valve_head_radius * np.pi)
 
         c.harmonic = 8
@@ -386,12 +412,12 @@ def port_flow(fpath):
 
         c.ir_volume = c.runner_a * c.runner_l
         c.er_volume = c.ir_volume / cfg["ir_to_er_ratio"]
-        arbitrary_primary_coeff = 1 / 3 * 5
-        c.primary_l = ((850 * (360 - evo) / cfg["max_power_rpm"]) - 3) * 2.54 * 0.5
-        c.primary_a = c.cyl_volume_cc * cc_to_ci * (cfg["max_torque_rpm"] * arbitrary_primary_coeff) / 88200 * si_to_cm2
+        c.primary_l = ((850 * (360 - evo) / cfg["max_power_rpm"]) - 3) * 2.54 / 4
+        # c.primary_a = c.cyl_volume_cc * cc_to_ci * (cfg["max_torque_rpm"] * cfg["primary_area_coeff"]) / 88200 * si_to_cm2
+        c.primary_a = c.exh_port_area * exh_num * cfg["primary_area_coeff"] / 100
         c.primary_d =  np.sqrt(c.primary_a / np.pi) * 2
         if cfg["exhaust_flange_dia"] is None:
-            c.collector_a = c.primary_a * cyl * (2/3)
+            c.collector_a = c.primary_a * cyl * cfg['collector_area_coeff']
             c.collector_d =  np.sqrt(c.collector_a / np.pi) * 2
         else:
             c.collector_d = cfg["exhaust_flange_dia"] / 10
@@ -411,6 +437,7 @@ def port_flow(fpath):
         ax2.clear()
         ax3.clear()
         setup_ax(ax)
+        remove_ticks_labels(ax2)
         
         cfg["power_factor"] = slider_i_pf.val
         cfg["port_to_valve_area"] = slider_i_pva.val
@@ -418,6 +445,8 @@ def port_flow(fpath):
         cfg["intake_runner_dia_mult"] = slider_i_irdm.val
         cfg["ir_to_er_ratio"] = slider_i_irerr.val
         cfg['smoothness'] = slider_i_smooth.val
+        cfg['primary_area_coeff'] = slider_i_pac.val
+        cfg['collector_area_coeff'] = slider_i_cac.val
 
         try:
             update_calc()
@@ -429,7 +458,7 @@ def port_flow(fpath):
     def print_flow(lifts, flow_samples):
         res = ""
         res += "\n        ".join([f".add_flow_sample({lift:.3f}, {sample:.1f})" for lift, sample in zip(lifts, flow_samples)])
-        return res + "\n"
+        return res
     
     def save(val):
         nonlocal c, raw, cfg, other
@@ -448,12 +477,6 @@ def port_flow(fpath):
     input flip_display: false;
     
     alias output __out: head;
-    function intake_flow({int_lift / resolution:.3f} * units.mm)
-    intake_flow
-        {print_flow(c.int_l, c.int_f)}
-    function exhaust_flow({exh_lift / resolution:.3f} * units.mm)
-    exhaust_flow
-        {print_flow(c.exh_l, c.exh_f)}
     generic_cylinder_head head(
         chamber_volume: {c.cyl_volume_cc / cr:.3f} * units.cc,
         intake_runner_volume: {c.ir_volume:.1f} * units.cc,
@@ -471,7 +494,11 @@ def port_flow(fpath):
     )\n}}"""
 
         head_pattern = r"(?<=public node head )\{([^{}]+)\}"
+        int_flow_pattern = r"(?<=public node intake_flow )\{([^{}]+)\}"
+        exh_flow_pattern = r"(?<=public node exhaust_flow )\{([^{}]+)\}"
         p_hp = regex.compile(head_pattern)
+        p_if = regex.compile(int_flow_pattern)
+        p_ef = regex.compile(exh_flow_pattern)
         matches = p_hp.findall(mr_content)
         if len(matches) > 0:
             with open(fpath, 'r+', encoding='utf-8') as f:
@@ -483,6 +510,26 @@ def port_flow(fpath):
                 p_ifr = regex.compile(r"intake_flow_rate: (.*?)(?=\n|$)")
                 p_irfr = regex.compile(r"runner_flow_rate: (.*?)(?=\n|$)")
                 p_ft = regex.compile(r"friction_torque: (.*?)(?=\n|$)")
+
+                if len(p_if.findall(mr_content)) > 0:
+                    ifl = f"""{{
+    alias output __out: _intake_flow;
+    function _intake_flow({int_lift / resolution:.3f} * units.mm)
+    _intake_flow
+        {print_flow(c.int_l, c.int_f)}\n}}"""
+                    file_contents = p_if.sub(ifl, file_contents)
+                else:
+                    raise ValueError("could not find intake_flow")
+
+                if len(p_ef.findall(mr_content)) > 0:
+                    efl = f"""{{
+    alias output __out: _exhaust_flow;
+    function _exhaust_flow({exh_lift / resolution:.3f} * units.mm)
+    _exhaust_flow
+        {print_flow(c.exh_l, c.exh_f)}\n}}"""
+                    file_contents = p_ef.sub(efl, file_contents)
+                else:
+                    raise ValueError("could not find exhaust_flow")
 
                 file_contents = p_hp.sub(head_flow, file_contents)
                 file_contents = p_ptl.sub(f"primary_tube_length: {c.primary_l:.1f} * units.cm,", file_contents)
@@ -535,6 +582,8 @@ def port_flow(fpath):
     slider_i_irdm.on_changed(update_plot)
     slider_i_irerr.on_changed(update_plot)
     slider_i_smooth.on_changed(update_plot)
+    slider_i_pac.on_changed(update_plot)
+    slider_i_cac.on_changed(update_plot)
     button_save.on_clicked(save)
     update_calc()
     plot_all()
