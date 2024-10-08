@@ -93,28 +93,29 @@ class Calc:
         self.int_f = None,  # intake flows array
         self.exh_l = None,  # exhaust lifts array
         self.exh_f = None,  # exhaust flows array
-        self.int_port_area = 0.0  # intake port area cm2
-        self.int_saturated_lift = 0.0  # intake saturated lift mm
-        self.exh_port_area = 0.0  # exhaust port area cm2
-        self.exh_saturated_lift = 0.0  # exhaust saturated lift mm
+        self.intake_port_area = 0.0  # intake port area cm2
+        self.intake_saturated_lift = 0.0  # intake saturated lift mm
+        self.exhaust_port_area = 0.0  # exhaust port area cm2
+        self.exhaust_saturated_lift = 0.0  # exhaust saturated lift mm
         self.cyl_volume_cc = 0.0  # cylinder volume CC
         self.engine_volume_l = 0.0  # engine volume L
         self.harmonic = 0.0  # intake runner resonance harmonic
-        self.runner_l = 0.0  # intake runner length cm
-        self.runner_a = 0.0  # intake runner cross section area cm2
-        self.runner_d = 0.0  # intake runner diameter cm
-        self.primary_l = 0.0  # exhaust primary length cm
-        self.primary_a = 0.0  # exhaust primary cross section area cm2
-        self.primary_d = 0.0  # exhaust primary diameter cm
-        self.collector_a = 0.0  # exhaust collector cross section area cm2
-        self.collector_d = 0.0  # exhaust collector diameter cm
-        self.ir_volume = 0.0  # intake runner volume cm3
-        self.er_volume = 0.0  # exhaust runner volume cm3
-        self.ifr = 0.0  # intake runner flow rate CFM
-        self.efr = 0.0  # exhaust runner flow rate CFM
-        self.i_runner_fr = 0.0  # intake runner flow rate CFM
-        self.e_primary_fr = 0.0  # exhaust primary flow rate CFM
-        self.plenum_vol = 0.0  # intake plenum volume L
+        self.runner_length = 0.0  # intake runner length cm
+        self.runner_area = 0.0  # intake runner cross section area cm2
+        self.runner_diameter = 0.0  # intake runner diameter cm
+        self.primary_length = 0.0  # exhaust primary length cm
+        self.primary_area = 0.0  # exhaust primary cross section area cm2
+        self.primary_diameter = 0.0  # exhaust primary diameter cm
+        self.collector_area = 0.0  # exhaust collector cross section area cm2
+        self.collector_diameter = 0.0  # exhaust collector diameter cm
+        self.intake_runner_volume = 0.0  # intake runner volume cm3
+        self.exhaust_runner_volume = 0.0  # exhaust runner volume cm3
+        self.intake_flow_rate = 0.0  # intake runner flow rate CFM
+        self.exhaust_flow_rate = 0.0  # exhaust runner flow rate CFM
+        self.intake_runner_flow_rate = 0.0  # intake runner flow rate CFM
+        self.exhaust_primary_flow_rate = 0.0  # exhaust primary flow rate CFM
+        self.plenum_volume = 0.0  # intake plenum volume L
+        self.blowby = 0.0  # piston blow-by
 
 
 def mm_to_inches_fraction(mm):
@@ -259,31 +260,31 @@ def port_flow(fpath):
     p_oft = parse.search("\nlabel offset({:f})", mr_content)
     p_crl = parse.search("\nlabel con_rod({:f})", mr_content)
 
-    int_num = p_inum[0]
-    int_head_dia = p_ivd[0]
-    int_lift = p_ivl[0]
+    number_of_intake_valves = p_inum[0]
+    intake_head_diameter = p_ivd[0]
+    intake_valve_lift = p_ivl[0]
 
-    exh_num = p_enum[0]
-    exh_head_dia = p_evd[0]
-    exh_lift = p_evl[0]
+    number_of_exhaust_valves = p_enum[0]
+    exhaust_head_diameter = p_evd[0]
+    exhaust_valve_lift = p_evl[0]
 
     bore = p_bore[0]
     stroke = p_stroke[0]
-    cr = p_cr[0]
-    cyl = p_cyl[0]
+    compression_ratio = p_cr[0]
+    number_of_cylinders = p_cyl[0]
     redline = p_redline[0]
     ivo = p_ivo[0]
     ivc = p_ivc[0]
     evo = p_evo[0]
-    crl = p_crl[0]
+    connecting_rod_length = p_crl[0]
 
     offset = 0
     if p_oft is not None:
         offset = p_oft[0]
 
     if offset != 0:
-        real_stroke = calculate_real_stroke(stroke, crl, offset)
-        print(f"TDC comp: {find_tdc_angle(stroke, crl, offset):.3f}")
+        real_stroke = calculate_real_stroke(stroke, connecting_rod_length, offset)
+        print(f"TDC comp: {find_tdc_angle(stroke, connecting_rod_length, offset):.3f}")
     else:
         real_stroke = stroke
 
@@ -324,21 +325,21 @@ def port_flow(fpath):
     button_save = Button(ax_save, 'save', color='black', hovercolor='skyblue')
 
     bore_area = quarter_pi * bore ** 2
-    int_valve_head_area = quarter_pi * int_head_dia ** 2
-    exh_valve_head_area = quarter_pi * exh_head_dia ** 2
+    intake_valve_head_area = quarter_pi * intake_head_diameter ** 2
+    exhaust_valve_head_area = quarter_pi * exhaust_head_diameter ** 2
 
     def plot_all():
         nonlocal c
 
         bore_radius = bore / 2
-        intake_radius = int_head_dia / 2
-        exhaust_radius = exh_head_dia / 2
-        int_stem_radius = intake_radius / cfg["valve_to_stem_dia"]
-        exh_stem_radius = exhaust_radius / cfg["valve_to_stem_dia"]
-        int_port_radius = np.sqrt(((np.pi * intake_radius**2) * cfg["port_to_valve_area"]) / np.pi)
-        exh_port_radius = np.sqrt(((np.pi * exhaust_radius**2) * cfg["port_to_valve_area"]) / np.pi)
-        int_port_radius_in = int_port_radius / 25.4
-        exh_port_radius_in = exh_port_radius / 25.4
+        intake_radius = intake_head_diameter / 2
+        exhaust_radius = exhaust_head_diameter / 2
+        intake_stem_radius = intake_radius / cfg["valve_to_stem_dia"]
+        exhaust_stem_radius = exhaust_radius / cfg["valve_to_stem_dia"]
+        intake_port_radius = np.sqrt(((np.pi * intake_radius**2) * cfg["port_to_valve_area"]) / np.pi)
+        exhaust_port_radius = np.sqrt(((np.pi * exhaust_radius**2) * cfg["port_to_valve_area"]) / np.pi)
+        intake_port_radius_in = intake_port_radius / 25.4
+        exhaust_port_radius_in = exhaust_port_radius / 25.4
 
         ax.plot(c.int_l, c.int_f, color='skyblue')
         ax.plot(c.exh_l, c.exh_f, color='orange')
@@ -348,22 +349,28 @@ def port_flow(fpath):
         ax.hlines(y=max(c.exh_f), xmin=0, xmax=max(c.exh_l), linestyle='--', colors='orange', linewidth=0.5)
 
         ax2.axis([0, 10, 0, 9])
-        ax2.text(0.2, 8.0, f'bore x stroke {bore} x {stroke}', fontsize=8)
-        ax2.text(9.8, 8.0, f'{mm_to_inches_fraction(bore)} x {mm_to_inches_fraction(stroke)}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 7.0, f'intake valve {int_head_dia} : {int_lift}', fontsize=8)
-        ax2.text(9.8, 7.0, f'{mm_to_inches_fraction(int_head_dia)} : {mm_to_inches_fraction(int_lift)}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 6.0, f'exhaust valve {exh_head_dia} : {exh_lift}', fontsize=8)
-        ax2.text(9.8, 6.0, f'{mm_to_inches_fraction(exh_head_dia)} : {mm_to_inches_fraction(exh_lift)}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 5.0, f'pr_d / col_d {c.primary_d:.2f} {c.collector_d:.2f}', fontsize=8)
-        ax2.text(9.8, 5.0, f'ir_fr / ep_fr {c.i_runner_fr:.2f} {c.e_primary_fr:.2f}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 4.0, f'saturated l {c.int_saturated_lift:.2f} {c.exh_saturated_lift:.2f}', fontsize=8)
-        ax2.text(9.8, 4.0, f'cr_l / cs_r {mm_to_inches_fraction(crl)} {crl/stroke:.2f}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 3.0, f'ir_v / er_v {c.ir_volume:.2f} {c.er_volume:.2f}', fontsize=8)
-        ax2.text(9.8, 3.0, f'ir_l / er_l {c.runner_l:.2f} {c.primary_l:.2f}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 2.0, f'int_a / exh_a {int_valve_head_area * int_num / bore_area * 100:.1f} {exh_valve_head_area * exh_num / bore_area * 100:.1f}', fontsize=8)
-        ax2.text(9.8, 2.0, f'i_cd / e_cd {int_port_radius * 2:.2f} {exh_port_radius * 2:.2f} : {int_port_radius_in * 2:.2f} {exh_port_radius_in * 2:.2f}', fontsize=8, horizontalalignment='right')
-        ax2.text(0.2, 1.0, f'volume        {c.engine_volume_l:.2f}', fontsize=8)
-        ax2.text(9.8, 1.0, f'{c.engine_volume_l * 1000 / ci_to_cc:.1f}', fontsize=8, horizontalalignment='right')
+        ax2.set_xlim(0, 10)
+        ax2.set_ylim(0, 9)
+
+        mf = {'fontsize': 8, 'family': 'monospace'}
+
+        ax2.text(0.2, 8.0, f'bore x stroke {bore} x {stroke}', **mf)
+        ax2.text(0.2, 7.0, f'intake valve {intake_head_diameter} : {intake_valve_lift}', **mf)
+        ax2.text(0.2, 6.0, f'exhaust valve {exhaust_head_diameter} : {exhaust_valve_lift}', **mf)
+        ax2.text(0.2, 5.0, f'pr_d / col_d {c.primary_diameter:.2f} {c.collector_diameter:.2f}', **mf)
+        ax2.text(0.2, 4.0, f'saturated l {c.intake_saturated_lift:.2f} {c.exhaust_saturated_lift:.2f}', **mf)
+        ax2.text(0.2, 3.0, f'ir_v / er_v {c.intake_runner_volume:.2f} {c.exhaust_runner_volume:.2f}', **mf)
+        ax2.text(0.2, 2.0, f'int_a / exh_a {intake_valve_head_area * number_of_intake_valves / bore_area * 100:.1f} {exhaust_valve_head_area * number_of_exhaust_valves / bore_area * 100:.1f}', **mf)
+        ax2.text(0.2, 1.0, f'volume {c.engine_volume_l:.2f}', **mf)
+
+        ax2.text(9.8, 8.0, f'{mm_to_inches_fraction(bore)} x {mm_to_inches_fraction(stroke)}', **mf, horizontalalignment='right')
+        ax2.text(9.8, 7.0, f'{mm_to_inches_fraction(intake_head_diameter)} : {mm_to_inches_fraction(intake_valve_lift)}', **mf, horizontalalignment='right')
+        ax2.text(9.8, 6.0, f'{mm_to_inches_fraction(exhaust_head_diameter)} : {mm_to_inches_fraction(exhaust_valve_lift)}', **mf, horizontalalignment='right')
+        ax2.text(9.8, 5.0, f'ir_fr / ep_fr {c.intake_runner_flow_rate:.2f} {c.exhaust_primary_flow_rate:.2f}', **mf, horizontalalignment='right')
+        ax2.text(9.8, 4.0, f'cr_l / cs_r {mm_to_inches_fraction(connecting_rod_length)} {connecting_rod_length/stroke:.3f}', **mf, horizontalalignment='right')
+        ax2.text(9.8, 3.0, f'ir_l / er_l {c.runner_length:.2f} {c.primary_length:.2f}', **mf, horizontalalignment='right')
+        ax2.text(9.8, 2.0, f'i_cd / e_cd {intake_port_radius * 2:.2f} {exhaust_port_radius * 2:.2f} : {intake_port_radius_in * 2:.2f} {exhaust_port_radius_in * 2:.2f}', **mf, horizontalalignment='right')
+        ax2.text(9.8, 1.0, f'{c.engine_volume_l * 1000 / ci_to_cc:.1f}', **mf, horizontalalignment='right')
 
         ax3.axis([0, 10, 0, 10])
         ax3.set_aspect('equal')
@@ -371,11 +378,11 @@ def port_flow(fpath):
         total_valve_width = intake_radius + exhaust_radius
         center_distance = (bore_radius - total_valve_width) / 2 + total_valve_width
         draw_circle(ax3, (-center_distance + intake_radius, 0), intake_radius, 'skyblue')
-        draw_circle(ax3, (-center_distance + intake_radius, 0), int_stem_radius, 'skyblue')
-        draw_circle(ax3, (-center_distance + intake_radius, 0), int_port_radius, 'skyblue', linestyle='--')
+        draw_circle(ax3, (-center_distance + intake_radius, 0), intake_stem_radius, 'skyblue')
+        draw_circle(ax3, (-center_distance + intake_radius, 0), intake_port_radius, 'skyblue', linestyle='--')
         draw_circle(ax3, (center_distance - exhaust_radius, 0), exhaust_radius, 'orange')
-        draw_circle(ax3, (center_distance - exhaust_radius, 0), exh_stem_radius, 'orange')
-        draw_circle(ax3, (center_distance - exhaust_radius, 0), exh_port_radius, 'orange', linestyle='--')
+        draw_circle(ax3, (center_distance - exhaust_radius, 0), exhaust_stem_radius, 'orange')
+        draw_circle(ax3, (center_distance - exhaust_radius, 0), exhaust_port_radius, 'orange', linestyle='--')
         ax3.set_xlim(-bore_radius - 1, bore_radius + 1)
         ax3.set_ylim(-bore_radius - 1, bore_radius + 1)
 
@@ -388,48 +395,51 @@ def port_flow(fpath):
 
         port_to_valve_head_radius = np.sqrt(cfg["port_to_valve_area"])
 
-        int_stem_area = quarter_pi * (int_head_dia / cfg["valve_to_stem_dia"]) ** 2
-        c.int_port_area = int_valve_head_area * cfg["port_to_valve_area"] - int_stem_area
-        c.int_saturated_lift = c.int_port_area / (int_head_dia * port_to_valve_head_radius * np.pi)
+        intake_stem_area = quarter_pi * (intake_head_diameter / cfg["valve_to_stem_dia"]) ** 2
+        c.intake_port_area = intake_valve_head_area * cfg["port_to_valve_area"] - intake_stem_area
+        c.intake_saturated_lift = c.intake_port_area / (intake_head_diameter * port_to_valve_head_radius * np.pi)
 
-        exh_stem_area = quarter_pi * (exh_head_dia / cfg["valve_to_stem_dia"]) ** 2
-        c.exh_port_area = exh_valve_head_area * cfg["port_to_valve_area"] - exh_stem_area
-        c.exh_saturated_lift = c.exh_port_area / (exh_head_dia * port_to_valve_head_radius * np.pi)
+        exhaust_stem_area = quarter_pi * (exhaust_head_diameter / cfg["valve_to_stem_dia"]) ** 2
+        c.exhaust_port_area = exhaust_valve_head_area * cfg["port_to_valve_area"] - exhaust_stem_area
+        c.exhaust_saturated_lift = c.exhaust_port_area / (exhaust_head_diameter * port_to_valve_head_radius * np.pi)
 
         c.harmonic = 8
         intake_duration = 180 + ivo + ivc
         c.cyl_volume_cc = quarter_pi * bore ** 2 * real_stroke / 1000
         r2 = c.cyl_volume_cc * cfg["max_power_rpm"] / np.pi / 2.54 / 88200
-        c.runner_d = np.sqrt(r2) * 2 * cfg["intake_runner_dia_mult"]
-        c.runner_l = ((720 - intake_duration) * 360 / (12 * cfg["max_power_rpm"]) + 0.003 * c.runner_d) / c.harmonic * 100
-        c.runner_a = quarter_pi * c.runner_d ** 2
+        c.runner_diameter = np.sqrt(r2) * 2 * cfg["intake_runner_dia_mult"]
+        c.runner_length = ((720 - intake_duration) * 360 / (12 * cfg["max_power_rpm"]) + 0.003 * c.runner_diameter) / c.harmonic * 100
+        c.runner_area = quarter_pi * c.runner_diameter ** 2
+        c.blowby = bore * np.pi / 10000
 
-        while c.runner_l > 20:
+        while c.runner_length > 20:
             if c.harmonic == 32:
                 break
             c.harmonic *= 2
-            c.runner_l /= 2
+            c.runner_length /= 2
 
-        c.ir_volume = c.runner_a * c.runner_l
-        c.er_volume = c.ir_volume / cfg["ir_to_er_ratio"]
-        c.primary_l = ((850 * (360 - evo) / cfg["max_power_rpm"]) - 3) * 2.54 / 4
-        # c.primary_a = c.cyl_volume_cc * cc_to_ci * (cfg["max_torque_rpm"] * cfg["primary_area_coeff"]) / 88200 * si_to_cm2
-        c.primary_a = c.exh_port_area * exh_num * cfg["primary_area_coeff"] / 100
-        c.primary_d =  np.sqrt(c.primary_a / np.pi) * 2
+        c.intake_runner_volume = c.runner_area * c.runner_length
+        c.exhaust_runner_volume = c.intake_runner_volume / cfg["ir_to_er_ratio"]
+        c.primary_length = ((850 * (360 - evo) / cfg["max_power_rpm"]) - 3) * 2.54 / 4
+        # c.primary_area = c.cyl_volume_cc * cc_to_ci * (cfg["max_torque_rpm"] * cfg["primary_area_coeff"]) / 88200 * si_to_cm2
+        c.primary_area = c.exhaust_port_area * number_of_exhaust_valves * cfg["primary_area_coeff"] / 100
+        c.primary_diameter =  np.sqrt(c.primary_area / np.pi) * 2
         if cfg["exhaust_flange_dia"] is None:
-            c.collector_a = c.primary_a * cyl * cfg['collector_area_coeff']
-            c.collector_d =  np.sqrt(c.collector_a / np.pi) * 2
+            c.collector_area = c.primary_area * number_of_cylinders * cfg['collector_area_coeff']
+            c.collector_diameter =  np.sqrt(c.collector_area / np.pi) * 2
         else:
-            c.collector_d = cfg["exhaust_flange_dia"] / 10
-            c.collector_a = np.pi * pow(c.collector_d / 2, 2)
-        c.engine_volume_l = c.cyl_volume_cc / 1000 * cyl
-        c.ifr = c.engine_volume_l * redline / 60  * ipf
-        c.efr = c.ifr / 3 * 5 * epf
-        c.i_runner_fr = c.ifr / (cyl / 2) * (ipf if ipf > 1 else 1)
-        c.e_primary_fr = c.efr / (cyl / 2) * (epf if epf > 1 else 1)
-        c.plenum_vol = c.engine_volume_l * cfg["max_power_rpm"] / 6666.666 * ((1 + cfg['power_factor']) / 2)
-        c.int_l, c.int_f = generate_flow(resolution, port_to_valve_head_radius, int_head_dia, int_lift, c.int_saturated_lift, int_num, 7, 3, cfg['smoothness'])
-        c.exh_l, c.exh_f = generate_flow(resolution, port_to_valve_head_radius, exh_head_dia, exh_lift, c.exh_saturated_lift, exh_num, 6, 3, cfg['smoothness'])
+            c.collector_diameter = cfg["exhaust_flange_dia"] / 10
+            c.collector_area = np.pi * pow(c.collector_diameter / 2, 2)
+        c.engine_volume_l = c.cyl_volume_cc / 1000 * number_of_cylinders
+        c.intake_flow_rate = c.engine_volume_l * redline / 60  * ipf
+        c.exhaust_flow_rate = c.intake_flow_rate / 3 * 5 * epf
+        c.intake_runner_flow_rate = c.intake_flow_rate / (number_of_cylinders / 2) * (ipf if ipf > 1 else 1)
+        c.exhaust_primary_flow_rate = c.exhaust_flow_rate / (number_of_cylinders / 2) * (epf if epf > 1 else 1)
+        c.plenum_volume = c.engine_volume_l * cfg["max_power_rpm"] / 6666.666 * ((1 + cfg['power_factor']) / 2)
+        c.int_l, c.int_f = generate_flow(resolution, port_to_valve_head_radius, intake_head_diameter,
+                                         intake_valve_lift, c.intake_saturated_lift, number_of_intake_valves, 7, 3, cfg['smoothness'])
+        c.exh_l, c.exh_f = generate_flow(resolution, port_to_valve_head_radius, exhaust_head_diameter,
+                                         exhaust_valve_lift, c.exhaust_saturated_lift, number_of_exhaust_valves, 6, 3, cfg['smoothness'])
 
     def update_plot(val):
         nonlocal c
@@ -464,12 +474,12 @@ def port_flow(fpath):
         nonlocal c, raw, cfg, other
         head_flow = f"""{{
     // port_flow.py v{ver}
-    // intake port area: {c.int_port_area * int_num / 100:.1f} cm²; saturated lift: {c.int_saturated_lift:.2f} mm
-    // exhaust port area: {c.exh_port_area * exh_num / 100:.1f} cm²; saturated lift: {c.exh_saturated_lift:.2f} mm
+    // intake port area: {c.intake_port_area * number_of_intake_valves / 100:.1f} cm²; saturated lift: {c.intake_saturated_lift:.2f} mm
+    // exhaust port area: {c.exhaust_port_area * number_of_exhaust_valves / 100:.1f} cm²; saturated lift: {c.exhaust_saturated_lift:.2f} mm
     // cylinder volume: {c.cyl_volume_cc:.1f} cm³ ({c.cyl_volume_cc / ci_to_cc:.1f} CI); engine volume: {c.engine_volume_l:.3f} L ({c.engine_volume_l * 1000 / ci_to_cc:.1f} CI)
-    // {c.harmonic} harmonic intake runner length: {c.runner_l:.1f} cm; diameter: {c.runner_d:.1f} cm
-    // primary length: {c.primary_l:.1f} cm, area: {c.primary_a:.1f} cm², diameter: {c.primary_d:.1f} cm
-    // collector diameter: {c.collector_d:.1f} cm, area: {c.collector_a:.1f} cm²
+    // {c.harmonic} harmonic intake runner length: {c.runner_length:.1f} cm; diameter: {c.runner_diameter:.1f} cm
+    // primary length: {c.primary_length:.1f} cm, area: {c.primary_area:.1f} cm², diameter: {c.primary_diameter:.1f} cm
+    // collector diameter: {c.collector_diameter:.1f} cm, area: {c.collector_area:.1f} cm²
     // target power: {cfg["max_power_rpm"]:.0f} RPM, power factor {cfg["power_factor"]:.2f}
 
     input intake_camshaft;
@@ -478,11 +488,11 @@ def port_flow(fpath):
     
     alias output __out: head;
     generic_cylinder_head head(
-        chamber_volume: {c.cyl_volume_cc / cr:.3f} * units.cc,
-        intake_runner_volume: {c.ir_volume:.1f} * units.cc,
-        intake_runner_cross_section_area: {c.runner_a:.1f} * units.cm2,
-        exhaust_runner_volume: {c.er_volume:.1f} * units.cc,
-        exhaust_runner_cross_section_area: {c.primary_a:.1f} * units.cm2,
+        chamber_volume: {c.cyl_volume_cc / compression_ratio:.3f} * units.cc,
+        intake_runner_volume: {c.intake_runner_volume:.1f} * units.cc,
+        intake_runner_cross_section_area: {c.runner_area:.1f} * units.cm2,
+        exhaust_runner_volume: {c.exhaust_runner_volume:.1f} * units.cc,
+        exhaust_runner_cross_section_area: {c.primary_area:.1f} * units.cm2,
 
         intake_port_flow: intake_flow,
         exhaust_port_flow: exhaust_flow,
@@ -510,11 +520,12 @@ def port_flow(fpath):
                 p_ifr = regex.compile(r"intake_flow_rate: (.*?)(?=\n|$)")
                 p_irfr = regex.compile(r"runner_flow_rate: (.*?)(?=\n|$)")
                 p_ft = regex.compile(r"friction_torque: (.*?)(?=\n|$)")
+                p_bb = regex.compile(r"blowby: (.*?)(?=\n|$)")
 
                 if len(p_if.findall(mr_content)) > 0:
                     ifl = f"""{{
     alias output __out: _intake_flow;
-    function _intake_flow({int_lift / resolution:.3f} * units.mm)
+    function _intake_flow({intake_valve_lift / resolution:.3f} * units.mm)
     _intake_flow
         {print_flow(c.int_l, c.int_f)}\n}}"""
                     file_contents = p_if.sub(ifl, file_contents)
@@ -524,7 +535,7 @@ def port_flow(fpath):
                 if len(p_ef.findall(mr_content)) > 0:
                     efl = f"""{{
     alias output __out: _exhaust_flow;
-    function _exhaust_flow({exh_lift / resolution:.3f} * units.mm)
+    function _exhaust_flow({exhaust_valve_lift / resolution:.3f} * units.mm)
     _exhaust_flow
         {print_flow(c.exh_l, c.exh_f)}\n}}"""
                     file_contents = p_ef.sub(efl, file_contents)
@@ -532,12 +543,13 @@ def port_flow(fpath):
                     raise ValueError("could not find exhaust_flow")
 
                 file_contents = p_hp.sub(head_flow, file_contents)
-                file_contents = p_ptl.sub(f"primary_tube_length: {c.primary_l:.1f} * units.cm,", file_contents)
-                file_contents = p_pv.sub(f"plenum_volume: {c.plenum_vol:.1f} * units.L,", file_contents)
-                file_contents = p_csa.sub(f"plenum_cross_section_area: {c.runner_a * cyl / 2:.1f} * units.cm2,", file_contents)
-                file_contents = p_rl.sub(f"runner_length: {c.runner_l:.1f} * units.cm,", file_contents)
-                file_contents = p_ifr.sub(f"intake_flow_rate: k_carb({c.ifr:.1f}),", file_contents)
-                file_contents = p_irfr.sub(f"runner_flow_rate: k_carb({c.i_runner_fr:.1f}),", file_contents)
+                file_contents = p_ptl.sub(f"primary_tube_length: {c.primary_length:.1f} * units.cm,", file_contents)
+                file_contents = p_pv.sub(f"plenum_volume: {c.plenum_volume:.1f} * units.L,", file_contents)
+                file_contents = p_csa.sub(f"plenum_cross_section_area: {c.runner_area * number_of_cylinders / 2:.1f} * units.cm2,", file_contents)
+                file_contents = p_rl.sub(f"runner_length: {c.runner_length:.1f} * units.cm,", file_contents)
+                file_contents = p_ifr.sub(f"intake_flow_rate: k_carb({c.intake_flow_rate:.1f}),", file_contents)
+                file_contents = p_irfr.sub(f"runner_flow_rate: k_carb({c.intake_runner_flow_rate:.1f}),", file_contents)
+                file_contents = p_bb.sub(f"blowby: k_28inH2O({c.blowby:.3f}),", file_contents)
 
                 num_of_cranks = len(regex.findall(r"(?<!//\s)\n\s*crankshaft ", file_contents))
                 file_contents = p_ft.sub(f"friction_torque: {c.engine_volume_l * 1.5 / num_of_cranks:.1f} * units.Nm,", file_contents) # rough relation
@@ -556,10 +568,10 @@ def port_flow(fpath):
                     p_efr = regex.compile(r"outlet_flow_rate: (.*?)(?=\n|$)")
                     p_erfr = regex.compile(r"primary_flow_rate: (.*?)(?=\n|$)")
                     replacement = block
-                    replacement = p_ea_l.sub(f"label collector_cross_section_area({c.collector_a / num_of_exh_systems:.1f})", replacement)
-                    replacement = p_ea.sub(f"collector_cross_section_area: {c.collector_a / num_of_exh_systems:.1f} * units.cm2,", replacement)
-                    replacement = p_efr.sub(f"outlet_flow_rate: k_carb({c.efr / num_of_exh_systems:.1f}),", replacement)
-                    replacement = p_erfr.sub(f"primary_flow_rate: k_carb({c.e_primary_fr:.1f}),", replacement)
+                    replacement = p_ea_l.sub(f"label collector_cross_section_area({c.collector_area / num_of_exh_systems:.1f})", replacement)
+                    replacement = p_ea.sub(f"collector_cross_section_area: {c.collector_area / num_of_exh_systems:.1f} * units.cm2,", replacement)
+                    replacement = p_efr.sub(f"outlet_flow_rate: k_carb({c.exhaust_flow_rate / num_of_exh_systems:.1f}),", replacement)
+                    replacement = p_erfr.sub(f"primary_flow_rate: k_carb({c.exhaust_primary_flow_rate:.1f}),", replacement)
                     es_replacements.append(replacement)
                 
                 for i, block in enumerate(es_blocks):
