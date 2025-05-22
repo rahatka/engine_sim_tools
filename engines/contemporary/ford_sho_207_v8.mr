@@ -1,0 +1,795 @@
+// Engine Sim V0.1.14A
+// 235 @ 6100
+// Created by oror 2023
+// 1-5-4-2-6-3-7-8
+
+/*
+{
+  "cam_cfg": {
+    "equal_base_radius": true,
+    "es_version": "0.1.14a",
+    "exhaust_at_lift": 1.27,
+    "exhaust_base_mult": 1.583,
+    "exhaust_cos": false,
+    "exhaust_sigma": 3.0,
+    "exhaust_trim": 0.75,
+    "exhaust_volume": 0.65,
+    "intake_at_lift": 1.27,
+    "intake_base_mult": 1.583,
+    "intake_cos": false,
+    "intake_sigma": 3.0,
+    "intake_trim": 0.75,
+    "intake_volume": 0.65,
+    "lift_significant_fraction": 250.0,
+    "ramp_position": 0.0,
+    "ramp_steepness": 0.0,
+    "resolution": 64,
+    "roller_tappet_radius": 0.0
+  },
+  "flow_cfg": {
+    "collector_area_coeff": 0.4,
+    "exhaust_flange_dia": null,
+    "exhaust_port_dia": null,
+    "exhaust_stem_dia": null,
+    "intake_port_dia": null,
+    "intake_runner_dia_mult": 1.0,
+    "intake_stem_dia": null,
+    "ir_to_er_ratio": 3.0,
+    "max_power_rpm": 6100.0,
+    "max_torque_rpm": 4000.0,
+    "port_to_valve_area": 0.85,
+    "power_factor": 1.1,
+    "primary_area_coeff": 1.1,
+    "resolution": 32,
+    "smoothness": 2.0,
+    "valve_to_stem_dia": 5.1
+  }
+}
+*/
+
+import "engine_sim.mr"
+import "_fuel_90.mr"
+
+units units()
+constants constants()
+
+label bore(82.4)
+label stroke(79.5)
+label compression_ratio(10.0)
+label con_rod(138.1) // 5.437
+label compression_height(30.0 * units.mm) // 1.181
+label intake_valve_diameter(32.0) // DNJ Part #IV4199
+label exhaust_valve_diameter(27.0) // DNJ Part #EV4199
+label intake_valves(2.0)
+label exhaust_valves(2.0)
+
+label redline(6500.0) // RPM
+
+label cyl(8.0)
+label row(2.0)
+label cycle(720.0 * units.deg)
+label vee(60.0 * units.deg)
+label rot(cycle / cyl)
+label rot90(90.0 * units.deg)
+label rot180(180.0 * units.deg)
+label rot360(360.0 * units.deg)
+
+// stock 176/203
+label IVL(10.0) // .394
+label EVL(10.41) // .410
+label IVO(-21.5 * units.deg) //BTDC
+label IVC(14.5 * units.deg) //ABDC
+label EVO(33.5 * units.deg) //BBDC
+label EVC(-10.5 * units.deg) //ATDC
+
+label intake_duration(IVO + IVC + rot180)
+label exhaust_duration(EVO + EVC + rot180)
+
+label ILC((rot180 - IVO + IVC) / 2.0 + rot360)
+label ELC((rot180 - EVO + EVC) / 2.0 + rot180)
+
+label con_rod_mass(560.0) // ? g
+label piston_mass(500.0) // ?
+label crank_mass(22.0) // ? kg
+label flywheel_mass(5.0) // kg
+
+label exhaust_delay_coeff(1.5)
+
+public node distributor {
+    input wires;
+    input timing_curve;
+    input limiter_duration: 0.09;
+    alias output __out:
+        ignition_module(timing_curve: timing_curve, rev_limit: redline * 1.05 * units.rpm, limiter_duration: limiter_duration)
+            .connect_wire(wires.wire1, rot * 0)
+            .connect_wire(wires.wire5, rot * 1)
+            .connect_wire(wires.wire4, rot * 2)
+            .connect_wire(wires.wire2, rot * 3)
+            .connect_wire(wires.wire6, rot * 4)
+            .connect_wire(wires.wire3, rot * 5)
+            .connect_wire(wires.wire7, rot * 6)
+            .connect_wire(wires.wire8, rot * 7);
+}
+
+private node wires {
+    output wire1: ignition_wire();
+    output wire2: ignition_wire();
+    output wire3: ignition_wire();
+    output wire4: ignition_wire();
+    output wire5: ignition_wire();
+    output wire6: ignition_wire();
+    output wire7: ignition_wire();
+    output wire8: ignition_wire();
+}
+
+public node intake_lobe_profile {
+    // lobes.py v0.9f
+    alias output __out: _lobe_profile;
+    function _lobe_profile(2.061 * units.deg)
+        _lobe_profile
+        .add_sample(-68.012 * units.deg, 0.000 * units.mm)
+        .add_sample(-65.951 * units.deg, 0.019 * units.mm)
+        .add_sample(-63.890 * units.deg, 0.172 * units.mm)
+        .add_sample(-61.829 * units.deg, 0.362 * units.mm)
+        .add_sample(-59.768 * units.deg, 0.606 * units.mm)
+        .add_sample(-57.707 * units.deg, 0.938 * units.mm)
+        .add_sample(-55.646 * units.deg, 1.379 * units.mm)
+        .add_sample(-53.585 * units.deg, 1.865 * units.mm)
+        .add_sample(-51.524 * units.deg, 2.368 * units.mm)
+        .add_sample(-49.463 * units.deg, 2.871 * units.mm)
+        .add_sample(-47.402 * units.deg, 3.376 * units.mm)
+        .add_sample(-45.341 * units.deg, 3.869 * units.mm)
+        .add_sample(-43.280 * units.deg, 4.361 * units.mm)
+        .add_sample(-41.219 * units.deg, 4.826 * units.mm)
+        .add_sample(-39.158 * units.deg, 5.292 * units.mm)
+        .add_sample(-37.097 * units.deg, 5.740 * units.mm)
+        .add_sample(-35.036 * units.deg, 6.160 * units.mm)
+        .add_sample(-32.975 * units.deg, 6.567 * units.mm)
+        .add_sample(-30.914 * units.deg, 6.965 * units.mm)
+        .add_sample(-28.853 * units.deg, 7.333 * units.mm)
+        .add_sample(-26.793 * units.deg, 7.671 * units.mm)
+        .add_sample(-24.732 * units.deg, 7.998 * units.mm)
+        .add_sample(-22.671 * units.deg, 8.309 * units.mm)
+        .add_sample(-20.610 * units.deg, 8.588 * units.mm)
+        .add_sample(-18.549 * units.deg, 8.836 * units.mm)
+        .add_sample(-16.488 * units.deg, 9.062 * units.mm)
+        .add_sample(-14.427 * units.deg, 9.279 * units.mm)
+        .add_sample(-12.366 * units.deg, 9.463 * units.mm)
+        .add_sample(-10.305 * units.deg, 9.614 * units.mm)
+        .add_sample(-8.244 * units.deg, 9.732 * units.mm)
+        .add_sample(-6.183 * units.deg, 9.848 * units.mm)
+        .add_sample(-4.122 * units.deg, 9.932 * units.mm)
+        .add_sample(-2.061 * units.deg, 9.983 * units.mm)
+        .add_sample(0.000 * units.deg, 10.000 * units.mm)
+        .add_sample(2.061 * units.deg, 9.983 * units.mm)
+        .add_sample(4.122 * units.deg, 9.932 * units.mm)
+        .add_sample(6.183 * units.deg, 9.848 * units.mm)
+        .add_sample(8.244 * units.deg, 9.732 * units.mm)
+        .add_sample(10.305 * units.deg, 9.614 * units.mm)
+        .add_sample(12.366 * units.deg, 9.463 * units.mm)
+        .add_sample(14.427 * units.deg, 9.279 * units.mm)
+        .add_sample(16.488 * units.deg, 9.062 * units.mm)
+        .add_sample(18.549 * units.deg, 8.836 * units.mm)
+        .add_sample(20.610 * units.deg, 8.588 * units.mm)
+        .add_sample(22.671 * units.deg, 8.309 * units.mm)
+        .add_sample(24.732 * units.deg, 7.998 * units.mm)
+        .add_sample(26.793 * units.deg, 7.671 * units.mm)
+        .add_sample(28.853 * units.deg, 7.333 * units.mm)
+        .add_sample(30.914 * units.deg, 6.965 * units.mm)
+        .add_sample(32.975 * units.deg, 6.567 * units.mm)
+        .add_sample(35.036 * units.deg, 6.160 * units.mm)
+        .add_sample(37.097 * units.deg, 5.740 * units.mm)
+        .add_sample(39.158 * units.deg, 5.292 * units.mm)
+        .add_sample(41.219 * units.deg, 4.826 * units.mm)
+        .add_sample(43.280 * units.deg, 4.361 * units.mm)
+        .add_sample(45.341 * units.deg, 3.869 * units.mm)
+        .add_sample(47.402 * units.deg, 3.376 * units.mm)
+        .add_sample(49.463 * units.deg, 2.871 * units.mm)
+        .add_sample(51.524 * units.deg, 2.368 * units.mm)
+        .add_sample(53.585 * units.deg, 1.865 * units.mm)
+        .add_sample(55.646 * units.deg, 1.379 * units.mm)
+        .add_sample(57.707 * units.deg, 0.938 * units.mm)
+        .add_sample(59.768 * units.deg, 0.606 * units.mm)
+        .add_sample(61.829 * units.deg, 0.362 * units.mm)
+        .add_sample(63.890 * units.deg, 0.172 * units.mm)
+        .add_sample(65.951 * units.deg, 0.019 * units.mm)
+        .add_sample(68.012 * units.deg, 0.000 * units.mm)
+}
+
+public node exhaust_lobe_profile {
+    // lobes.py v0.9f
+    alias output __out: _lobe_profile;
+    function _lobe_profile(2.392 * units.deg)
+        _lobe_profile
+        .add_sample(-76.532 * units.deg, 0.000 * units.mm)
+        .add_sample(-74.140 * units.deg, 0.062 * units.mm)
+        .add_sample(-71.748 * units.deg, 0.204 * units.mm)
+        .add_sample(-69.357 * units.deg, 0.376 * units.mm)
+        .add_sample(-66.965 * units.deg, 0.578 * units.mm)
+        .add_sample(-64.574 * units.deg, 0.816 * units.mm)
+        .add_sample(-62.182 * units.deg, 1.105 * units.mm)
+        .add_sample(-59.790 * units.deg, 1.454 * units.mm)
+        .add_sample(-57.399 * units.deg, 1.883 * units.mm)
+        .add_sample(-55.007 * units.deg, 2.379 * units.mm)
+        .add_sample(-52.615 * units.deg, 2.909 * units.mm)
+        .add_sample(-50.224 * units.deg, 3.457 * units.mm)
+        .add_sample(-47.832 * units.deg, 4.004 * units.mm)
+        .add_sample(-45.441 * units.deg, 4.543 * units.mm)
+        .add_sample(-43.049 * units.deg, 5.079 * units.mm)
+        .add_sample(-40.657 * units.deg, 5.595 * units.mm)
+        .add_sample(-38.266 * units.deg, 6.091 * units.mm)
+        .add_sample(-35.874 * units.deg, 6.579 * units.mm)
+        .add_sample(-33.483 * units.deg, 7.029 * units.mm)
+        .add_sample(-31.091 * units.deg, 7.463 * units.mm)
+        .add_sample(-28.699 * units.deg, 7.879 * units.mm)
+        .add_sample(-26.308 * units.deg, 8.254 * units.mm)
+        .add_sample(-23.916 * units.deg, 8.598 * units.mm)
+        .add_sample(-21.525 * units.deg, 8.935 * units.mm)
+        .add_sample(-19.133 * units.deg, 9.228 * units.mm)
+        .add_sample(-16.741 * units.deg, 9.477 * units.mm)
+        .add_sample(-14.350 * units.deg, 9.715 * units.mm)
+        .add_sample(-11.958 * units.deg, 9.921 * units.mm)
+        .add_sample(-9.566 * units.deg, 10.082 * units.mm)
+        .add_sample(-7.175 * units.deg, 10.202 * units.mm)
+        .add_sample(-4.783 * units.deg, 10.317 * units.mm)
+        .add_sample(-2.392 * units.deg, 10.387 * units.mm)
+        .add_sample(0.000 * units.deg, 10.410 * units.mm)
+        .add_sample(2.392 * units.deg, 10.387 * units.mm)
+        .add_sample(4.783 * units.deg, 10.317 * units.mm)
+        .add_sample(7.175 * units.deg, 10.202 * units.mm)
+        .add_sample(9.566 * units.deg, 10.082 * units.mm)
+        .add_sample(11.958 * units.deg, 9.921 * units.mm)
+        .add_sample(14.350 * units.deg, 9.715 * units.mm)
+        .add_sample(16.741 * units.deg, 9.477 * units.mm)
+        .add_sample(19.133 * units.deg, 9.228 * units.mm)
+        .add_sample(21.525 * units.deg, 8.935 * units.mm)
+        .add_sample(23.916 * units.deg, 8.598 * units.mm)
+        .add_sample(26.308 * units.deg, 8.254 * units.mm)
+        .add_sample(28.699 * units.deg, 7.879 * units.mm)
+        .add_sample(31.091 * units.deg, 7.463 * units.mm)
+        .add_sample(33.483 * units.deg, 7.029 * units.mm)
+        .add_sample(35.874 * units.deg, 6.579 * units.mm)
+        .add_sample(38.266 * units.deg, 6.091 * units.mm)
+        .add_sample(40.657 * units.deg, 5.595 * units.mm)
+        .add_sample(43.049 * units.deg, 5.079 * units.mm)
+        .add_sample(45.441 * units.deg, 4.543 * units.mm)
+        .add_sample(47.832 * units.deg, 4.004 * units.mm)
+        .add_sample(50.224 * units.deg, 3.457 * units.mm)
+        .add_sample(52.615 * units.deg, 2.909 * units.mm)
+        .add_sample(55.007 * units.deg, 2.379 * units.mm)
+        .add_sample(57.399 * units.deg, 1.883 * units.mm)
+        .add_sample(59.790 * units.deg, 1.454 * units.mm)
+        .add_sample(62.182 * units.deg, 1.105 * units.mm)
+        .add_sample(64.574 * units.deg, 0.816 * units.mm)
+        .add_sample(66.965 * units.deg, 0.578 * units.mm)
+        .add_sample(69.357 * units.deg, 0.376 * units.mm)
+        .add_sample(71.748 * units.deg, 0.204 * units.mm)
+        .add_sample(74.140 * units.deg, 0.062 * units.mm)
+        .add_sample(76.532 * units.deg, 0.000 * units.mm)
+}
+
+public node intake_flow {
+    alias output __out: _intake_flow;
+    function _intake_flow(0.323 * units.mm)
+    _intake_flow
+        .add_flow_sample(0.000, 0.0)
+        .add_flow_sample(0.323, 14.2)
+        .add_flow_sample(0.645, 27.7)
+        .add_flow_sample(0.968, 40.3)
+        .add_flow_sample(1.290, 51.8)
+        .add_flow_sample(1.613, 62.4)
+        .add_flow_sample(1.935, 72.3)
+        .add_flow_sample(2.258, 81.6)
+        .add_flow_sample(2.581, 90.5)
+        .add_flow_sample(2.903, 98.9)
+        .add_flow_sample(3.226, 107.1)
+        .add_flow_sample(3.548, 114.9)
+        .add_flow_sample(3.871, 122.5)
+        .add_flow_sample(4.194, 129.8)
+        .add_flow_sample(4.516, 136.9)
+        .add_flow_sample(4.839, 143.8)
+        .add_flow_sample(5.161, 150.5)
+        .add_flow_sample(5.484, 157.0)
+        .add_flow_sample(5.806, 163.3)
+        .add_flow_sample(6.129, 169.2)
+        .add_flow_sample(6.452, 174.7)
+        .add_flow_sample(6.774, 179.5)
+        .add_flow_sample(7.097, 183.3)
+        .add_flow_sample(7.419, 186.0)
+        .add_flow_sample(7.742, 187.7)
+        .add_flow_sample(8.065, 188.7)
+        .add_flow_sample(8.387, 189.3)
+        .add_flow_sample(8.710, 189.6)
+        .add_flow_sample(9.032, 189.8)
+        .add_flow_sample(9.355, 190.0)
+        .add_flow_sample(9.677, 190.2)
+        .add_flow_sample(10.000, 190.4)
+}
+
+public node exhaust_flow {
+    alias output __out: _exhaust_flow;
+    function _exhaust_flow(0.336 * units.mm)
+    _exhaust_flow
+        .add_flow_sample(0.000, 0.0)
+        .add_flow_sample(0.336, 13.9)
+        .add_flow_sample(0.672, 27.2)
+        .add_flow_sample(1.007, 39.5)
+        .add_flow_sample(1.343, 50.6)
+        .add_flow_sample(1.679, 60.9)
+        .add_flow_sample(2.015, 70.4)
+        .add_flow_sample(2.351, 79.3)
+        .add_flow_sample(2.686, 87.8)
+        .add_flow_sample(3.022, 95.9)
+        .add_flow_sample(3.358, 103.6)
+        .add_flow_sample(3.694, 111.0)
+        .add_flow_sample(4.030, 118.1)
+        .add_flow_sample(4.365, 125.0)
+        .add_flow_sample(4.701, 131.6)
+        .add_flow_sample(5.037, 137.8)
+        .add_flow_sample(5.373, 143.4)
+        .add_flow_sample(5.709, 148.2)
+        .add_flow_sample(6.045, 151.9)
+        .add_flow_sample(6.380, 154.5)
+        .add_flow_sample(6.716, 156.1)
+        .add_flow_sample(7.052, 157.0)
+        .add_flow_sample(7.388, 157.5)
+        .add_flow_sample(7.724, 157.8)
+        .add_flow_sample(8.059, 158.0)
+        .add_flow_sample(8.395, 158.2)
+        .add_flow_sample(8.731, 158.4)
+        .add_flow_sample(9.067, 158.6)
+        .add_flow_sample(9.403, 158.7)
+        .add_flow_sample(9.738, 158.9)
+        .add_flow_sample(10.074, 159.1)
+        .add_flow_sample(10.410, 159.2)
+}
+
+intake_lobe_profile intake_lobe_profile()
+exhaust_lobe_profile exhaust_lobe_profile()
+
+intake_flow intake_flow()
+exhaust_flow exhaust_flow()
+
+public node camshaft_builder {
+    output intake_cam_0: _intake_cam_0;
+    output exhaust_cam_0: _exhaust_cam_0;
+
+    output intake_cam_1: _intake_cam_1;
+    output exhaust_cam_1: _exhaust_cam_1;
+
+    camshaft _intake_cam_0(base_radius: 16.2 * units.mm, lobe_profile: intake_lobe_profile)
+    camshaft _exhaust_cam_0(base_radius: 16.2 * units.mm, lobe_profile: exhaust_lobe_profile)
+    
+    camshaft _intake_cam_1(base_radius: 16.2 * units.mm, lobe_profile: intake_lobe_profile)
+    camshaft _exhaust_cam_1(base_radius: 16.2 * units.mm, lobe_profile: exhaust_lobe_profile)
+
+    _intake_cam_0
+        .add_lobe(ILC + 0 * rot)
+        .add_lobe(ILC + 3 * rot)
+        .add_lobe(ILC + 5 * rot)
+        .add_lobe(ILC + 2 * rot)
+    _exhaust_cam_0
+        .add_lobe(ELC + 0 * rot)
+        .add_lobe(ELC + 3 * rot)
+        .add_lobe(ELC + 5 * rot)
+        .add_lobe(ELC + 2 * rot)
+        
+    _intake_cam_1
+        .add_lobe(ILC + 1 * rot)
+        .add_lobe(ILC + 4 * rot)
+        .add_lobe(ILC + 6 * rot)
+        .add_lobe(ILC + 7 * rot)
+    _exhaust_cam_1
+        .add_lobe(ELC + 1 * rot)
+        .add_lobe(ELC + 4 * rot)
+        .add_lobe(ELC + 6 * rot)
+        .add_lobe(ELC + 7 * rot)
+}
+
+private node add_flow_sample {
+    input lift;
+    input flow;
+    input this;
+    alias output __out: this;
+
+    this.add_sample(lift * units.mm, k_28inH2O(flow))
+}
+
+public node head {
+    // port_flow.py v1.5
+    // intake port area: 13.1 cm²; saturated lift: 7.04 mm
+    // exhaust port area: 9.3 cm²; saturated lift: 5.94 mm
+    // cylinder volume: 423.9 cm³ (25.9 CI); engine volume: 3.392 L (207.0 CI)
+    // chamber volume: 47.1 cm³ (2.9 CI)
+    // 16 harmonic intake runner length: 16.9 cm; diameter: 3.8 cm
+    // primary length: 27.0 cm, area: 10.2 cm², diameter: 3.6 cm
+    // collector diameter: 6.5 cm, area: 32.7 cm²
+
+    input intake_camshaft;
+    input exhaust_camshaft;
+    input flip_display: false;
+    
+    alias output __out: head;
+    generic_cylinder_head head(
+        chamber_volume: 47.105 * units.cc,
+        intake_runner_volume: 194.9 * units.cc,
+        intake_runner_cross_section_area: 11.5 * units.cm2,
+        exhaust_runner_volume: 65.0 * units.cc,
+        exhaust_runner_cross_section_area: 10.2 * units.cm2,
+
+        intake_port_flow: intake_flow,
+        exhaust_port_flow: exhaust_flow,
+        valvetrain: standard_valvetrain(
+            intake_camshaft: intake_camshaft,
+            exhaust_camshaft: exhaust_camshaft
+        ),
+        flip_display: flip_display
+    )
+}
+
+public node eng {
+    alias output __out: engine;
+
+    engine engine(
+        name: "Ford SHO 3.4 V8",
+        starter_torque: 100 * units.Nm,
+        starter_speed: 200 * units.rpm,
+        redline: redline * units.rpm,
+        fuel: s90(),
+        throttle_gamma: 1.5,
+        jitter: es.jitter,
+        noise: es.noise,
+        hf_gain: es.hf_gain,
+        simulation_frequency: 10000,
+        dyno_min_speed: 500 * units.rpm
+    )
+
+    wires wires()
+
+    label crank_moment(disk_moment_of_inertia(mass: crank_mass * units.kg, radius: (stroke / 2.0) * units.mm))
+    label flywheel_moment(disk_moment_of_inertia(mass: flywheel_mass * units.kg, radius: (stroke * 3.5) * units.mm))
+    label other_moment(disk_moment_of_inertia(mass: 1 * units.kg, radius: 1.0 * units.cm))
+
+    crankshaft c0(
+        throw: (stroke / 2.0) * units.mm,
+        flywheel_mass: flywheel_mass * units.kg,
+        mass: crank_mass * units.kg,
+        friction_torque: 5.1 * units.Nm,
+        moment_of_inertia: crank_moment + flywheel_moment + other_moment,
+        tdc: 0.0
+    )
+
+    rod_journal rj0(angle: rot * 0 + rot90 + vee / 2)
+    rod_journal rj2(angle: rot * 3 + rot90 + vee / 2)
+    rod_journal rj4(angle: rot * 1 + rot90 + vee / 2)
+    rod_journal rj6(angle: rot * 6 + rot90 + vee / 2)
+
+    rod_journal rj1(angle: rot * 0 + rot90 + vee / 2 + (rot - vee))
+    rod_journal rj3(angle: rot * 3 + rot90 + vee / 2 + (rot - vee))
+    rod_journal rj5(angle: rot * 1 + rot90 + vee / 2 + (rot - vee))
+    rod_journal rj7(angle: rot * 6 + rot90 + vee / 2 + (rot - vee))
+    
+    c0
+        .add_rod_journal(rj0)
+        .add_rod_journal(rj1)
+        .add_rod_journal(rj2)
+        .add_rod_journal(rj3)
+        .add_rod_journal(rj4)
+        .add_rod_journal(rj5)
+        .add_rod_journal(rj6)
+        .add_rod_journal(rj7)
+
+    piston_parameters piston_params(
+        mass: piston_mass * units.g,
+        blowby: k_28inH2O(0.026),
+        compression_height: compression_height,
+        wrist_pin_position: 0.0,
+        displacement: 0.0
+    )
+
+    connecting_rod_parameters cr_params(
+        mass: con_rod_mass * units.g,
+        moment_of_inertia: rod_moment_of_inertia(
+            mass: con_rod_mass * units.g,
+            length: con_rod * units.mm
+        ),
+        center_of_mass: 0.0,
+        length: con_rod * units.mm
+    )
+
+    cylinder_bank_parameters bank_params(
+        bore: bore * units.mm,
+        deck_height: (con_rod + stroke / 2.0) * units.mm + compression_height
+    )
+
+    intake intake(
+        plenum_volume: 3.3 * units.L,
+        plenum_cross_section_area: 46.2 * units.cm2,
+        runner_length: 16.9 * units.cm,
+        intake_flow_rate: k_carb(385.8),
+        idle_flow_rate: k_carb(0.02),
+        idle_throttle_plate_position: 0.997,
+        runner_flow_rate: k_carb(101.3),
+        velocity_decay: 0.05
+    )
+ 
+    cylinder_bank b0(bank_params, angle: vee / 2)
+    cylinder_bank b1(bank_params, angle: -vee / 2)
+
+    es1 es()
+
+    b0
+        .add_cylinder(
+            piston: piston(piston_params),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj0,
+            intake: intake,
+            exhaust_system: es.es0,
+            primary_length: es.pl0,
+            ignition_wire: wires.wire1
+        )
+        .add_cylinder(
+            piston: piston(piston_params),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj2,
+            intake: intake,
+            exhaust_system: es.es1,
+            primary_length: es.pl1,
+            ignition_wire: wires.wire2
+        )
+        .add_cylinder(
+            piston: piston(piston_params),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj4,
+            intake: intake,
+            exhaust_system: es.es2,
+            primary_length: es.pl2,
+            ignition_wire: wires.wire3
+        )
+        .add_cylinder(
+            piston: piston(piston_params),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj6,
+            intake: intake,
+            exhaust_system: es.es3,
+            primary_length: es.pl3,
+            ignition_wire: wires.wire4
+        )
+        
+    b1
+        .add_cylinder(
+            piston: piston(piston_params),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj1,
+            intake: intake,
+            exhaust_system: es.es4,
+            primary_length: es.pl4,
+            ignition_wire: wires.wire5
+        )
+        .add_cylinder(
+            piston: piston(piston_params),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj3,
+            intake: intake,
+            exhaust_system: es.es5,
+            primary_length: es.pl5,
+            ignition_wire: wires.wire6
+        )
+        .add_cylinder(
+            piston: piston(piston_params),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj5,
+            intake: intake,
+            exhaust_system: es.es6,
+            primary_length: es.pl6,
+            ignition_wire: wires.wire7
+        )
+        .add_cylinder(
+            piston: piston(piston_params),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj7,
+            intake: intake,
+            exhaust_system: es.es7,
+            primary_length: es.pl7,
+            ignition_wire: wires.wire8
+        )
+
+    engine
+        .add_cylinder_bank(b0)
+        .add_cylinder_bank(b1)
+        .add_crankshaft(c0)
+
+    camshaft_builder camshaft()
+    
+    engine.add_ignition_module(
+        distributor(
+            wires: wires,
+            timing_curve: timing_curve
+        )
+    )
+
+    b0.set_cylinder_head (
+        head(
+            intake_camshaft: camshaft.intake_cam_0,
+            exhaust_camshaft: camshaft.exhaust_cam_0,
+            flip_display: true
+        )
+    )
+    b1.set_cylinder_head (
+        head(
+            intake_camshaft: camshaft.intake_cam_1,
+            exhaust_camshaft: camshaft.exhaust_cam_1
+        )
+    )
+
+    // ignition_timing.py v0.3 from = 8.0, to = 30.0, i = 750, r = 6500
+    function timing_curve(650.0 * units.rpm)
+    timing_curve
+        .add_sample(0.0 * units.rpm, 0.0 * units.deg)
+        .add_sample(650.0 * units.rpm, 4.0 * units.deg)
+        .add_sample(1300.0 * units.rpm, 8.0 * units.deg)
+        .add_sample(1950.0 * units.rpm, 12.6 * units.deg)
+        .add_sample(2600.0 * units.rpm, 16.4 * units.deg)
+        .add_sample(3250.0 * units.rpm, 19.7 * units.deg)
+        .add_sample(3900.0 * units.rpm, 22.5 * units.deg)
+        .add_sample(4550.0 * units.rpm, 24.9 * units.deg)
+        .add_sample(5200.0 * units.rpm, 26.9 * units.deg)
+        .add_sample(5850.0 * units.rpm, 28.6 * units.deg)
+        .add_sample(6500.0 * units.rpm, 30.0 * units.deg)
+        .add_sample(7150.0 * units.rpm, -15.0 * units.deg)
+        .add_sample(7800.0 * units.rpm, -60.0 * units.deg)
+}
+
+private node es0{
+    output es0: exhaust0;
+    output es1: exhaust0;
+    output es2: exhaust0;
+    output es3: exhaust0;
+    output es4: exhaust1;
+    output es5: exhaust1;
+    output es6: exhaust1;
+    output es7: exhaust1;
+    output pl0: _pl0;
+    output pl1: _pl1;
+    output pl2: _pl2;
+    output pl3: _pl3;
+    output pl4: _pl4;
+    output pl5: _pl5;
+    output pl6: _pl6;
+    output pl7: _pl7;
+    output jitter: 0.5;
+    output noise: 0.1;
+    output hf_gain: 0.004;
+
+    label flange_density(1.0 * exhaust_delay_coeff)
+    label collector_cross_section_area(16.4)
+    label exhaust_pipe_length_0(425.0) // cm
+    label exhaust_volume_0(collector_cross_section_area * exhaust_pipe_length_0 / 100.0) // Litres
+    label exhaust_pipe_length_1(400.0) // cm
+    label exhaust_volume_1(collector_cross_section_area * exhaust_pipe_length_1 / 100.0) // Litres
+    label spacing_factor(1.1)
+
+    float _pl0 ((1.7 * bore * spacing_factor / flange_density) * units.mm)
+    float _pl1 ((1.1 * bore * spacing_factor / flange_density) * units.mm)
+    float _pl2 ((2.0 * bore * spacing_factor / flange_density) * units.mm)
+    float _pl3 ((3.0 * bore * spacing_factor / flange_density) * units.mm)
+    
+    float _pl4 ((3.0 * bore * spacing_factor / flange_density) * units.mm)
+    float _pl5 ((2.0 * bore * spacing_factor / flange_density) * units.mm)
+    float _pl6 ((1.1 * bore * spacing_factor / flange_density) * units.mm)
+    float _pl7 ((1.7 * bore * spacing_factor / flange_density) * units.mm)
+
+    exhaust_system_parameters es_params0(
+        outlet_flow_rate: k_carb(329.5),
+        collector_cross_section_area: 16.4 * units.cm2,
+        length: exhaust_pipe_length_0 * units.cm,
+        primary_tube_length: 27.0 * units.cm,
+        primary_flow_rate: k_carb(168.9),
+        velocity_decay: 1.0,
+        volume: (exhaust_volume_0 + 2.0) * units.L
+    )
+    
+    exhaust_system_parameters es_params1(
+        outlet_flow_rate: k_carb(329.5),
+        collector_cross_section_area: 16.4 * units.cm2,
+        length: exhaust_pipe_length_1 * units.cm,
+        primary_tube_length: 27.0 * units.cm,
+        primary_flow_rate: k_carb(168.9),
+        velocity_decay: 1.0,
+        volume: (exhaust_volume_1 + 2.0) * units.L
+    )
+
+    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_56.wav", volume: 0.00025))
+    exhaust_system exhaust1(es_params1, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_56.wav", volume: 0.00025))
+}
+
+private node es1{
+    output es0: exhaust0;
+    output es1: exhaust0;
+    output es2: exhaust0;
+    output es3: exhaust0;
+    output es4: exhaust0;
+    output es5: exhaust0;
+    output es6: exhaust0;
+    output es7: exhaust0;
+    output pl0: _pl0;
+    output pl1: _pl1;
+    output pl2: _pl2;
+    output pl3: _pl3;
+    output pl4: _pl4;
+    output pl5: _pl5;
+    output pl6: _pl6;
+    output pl7: _pl7;
+    output jitter: 0.8;
+    output noise: 0.1;
+    output hf_gain: 0.007;
+
+    label flange_density(1.0 * exhaust_delay_coeff)
+    label collector_cross_section_area(32.7)
+    label exhaust_pipe_length_0(400.0) // cm
+    label exhaust_volume_0(collector_cross_section_area * exhaust_pipe_length_0 / 100.0) // Litres
+    label spacing_factor(1.1)
+
+    label sh((450.0 / exhaust_delay_coeff) * units.mm)
+
+    float _pl0 ((1.8 * bore * spacing_factor / flange_density) * units.mm)
+    float _pl1 ((1.0 * bore * spacing_factor / flange_density) * units.mm)
+    float _pl2 ((1.0 * bore * spacing_factor / flange_density) * units.mm)
+    float _pl3 ((1.8 * bore * spacing_factor / flange_density) * units.mm)
+    
+    float _pl4 ((1.8 * bore * spacing_factor / flange_density) * units.mm + sh)
+    float _pl5 ((1.0 * bore * spacing_factor / flange_density) * units.mm + sh)
+    float _pl6 ((1.0 * bore * spacing_factor / flange_density) * units.mm + sh)
+    float _pl7 ((1.8 * bore * spacing_factor / flange_density) * units.mm + sh)
+
+    exhaust_system_parameters es_params0(
+        outlet_flow_rate: k_carb(659.1),
+        collector_cross_section_area: 32.7 * units.cm2,
+        length: exhaust_pipe_length_0 * units.cm,
+        primary_tube_length: 27.0 * units.cm,
+        primary_flow_rate: k_carb(168.9),
+        velocity_decay: 1.0,
+        volume: (exhaust_volume_0 + 4.0) * units.L
+    )
+
+    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_56.wav", volume: 0.001))
+}
+
+// 1997 Ford Taurus III SHO
+public node veh {
+    alias output __out: vehicle;
+
+    label car_mass(1660) // 1560
+
+    vehicle vehicle(
+        mass: car_mass * units.kg,
+        drag_coefficient: 0.31,
+        cross_sectional_area: (1854 * units.mm) * (1400 * units.mm),
+        diff_ratio: 3.77,
+        tire_radius: (653.9 / 2) * units.mm, // 225/55 R16
+        rolling_resistance: 0.012 * car_mass * 9.81
+        )
+}
+
+// 1997 Ford Taurus III SHO AXOD / AXOD-E / AX4S / AX4N
+private node trn {
+    alias output __out:
+        transmission(
+            max_clutch_torque: 400 * units.Nm,
+            max_clutch_flex: 8 * units.deg,
+            limit_clutch_flex: true,
+            clutch_stiffness: 70 * units.Nm / units.deg,
+            clutch_damping: 1.0,
+            simulate_flex: true
+        )
+        .add_gear(2.771)
+        .add_gear(1.543)
+        .add_gear(1.000)
+        .add_gear(0.694);
+}
+
+run(
+    engine: eng(),
+    transmission: trn(),
+    vehicle: veh()
+)

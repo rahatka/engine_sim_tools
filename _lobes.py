@@ -14,8 +14,18 @@ from scipy.interpolate import interp1d
 from comment_parser import comment_parser
 from tkinter.filedialog import askopenfilename
 
-ver = "0.9f"
+ver = "1.0"
 
+
+class Calc:
+    def __init__(self):
+        self.ivd = 0.0  # intake duration
+        self.evd = 0.0
+        self.lsa = 0.0
+        self.adv = 0.0
+        self.ovl = 0.0
+
+c = Calc()
 
 def round_floats(o):
     if isinstance(o, float):
@@ -302,15 +312,21 @@ def plot_all(ax, fpath, cfg, int_lift, exh_lift, ivo, ivc, evo, evc):
     i_formula = cos_formula if cfg["intake_cos"] else exp_formula
     e_formula = cos_formula if cfg["exhaust_cos"] else exp_formula
 
+    c.ivd = int_dur
+    c.evd = exh_dur
+    c.lsa = i_c - e_c
+    c.adv = -e_c - i_c
+    c.ovl = ivo + evc
+
     ax.text(0.05, 0.08,
              f'{os.path.basename(fpath)}\nIVO IVC: {ivo} {ivc}\nEVO EVC: {evo} {evc}'
-             f'\nLSA: {i_c - e_c:.2f}\nadvance: {-e_c - i_c:.2f}\noverlap: {ivo + evc:.1f}\nbase intake formula: {i_formula}\nbase exhaust formula: {e_formula}'
+             f'\nLSA: {c.lsa:.2f}\nadvance: {c.adv:.2f}\noverlap: {c.ovl:.1f}\nbase intake formula: {i_formula}\nbase exhaust formula: {e_formula}'
              f'\nintake lift: {int_lift:.2f} mm ({int_lift * 0.03937:.3f}″)'
              f'\nexhaust lift: {exh_lift:.2f} mm ({exh_lift * 0.03937:.3f}″)'
              f'\nadvertised intake duration: {i_adv_dur:.1f}\nadvertised exhaust duration: {e_adv_dur:.1f}'
-             f'\nintake duration: {int_dur:.1f} @ {cfg["intake_at_lift"]:.3f} mm ({cfg["intake_at_lift"] * 0.03937:.3f}″)'
-             f'\nexhaust duration: {exh_dur:.1f} @ {cfg["exhaust_at_lift"]:.3f} mm ({cfg["exhaust_at_lift"] * 0.03937:.3f}″)'
-             f'\n\nlobes.py v{ver} © oror 2023',
+             f'\nintake duration: {c.ivd:.1f} @ {cfg["intake_at_lift"]:.3f} mm ({cfg["intake_at_lift"] * 0.03937:.3f}″)'
+             f'\nexhaust duration: {c.evd:.1f} @ {cfg["exhaust_at_lift"]:.3f} mm ({cfg["exhaust_at_lift"] * 0.03937:.3f}″)'
+             f'\n\nlobes.py v{ver} © oror 2025',
              transform=plt.gcf().transFigure)
 
     base_x = np.linspace(-np.pi, np.pi, 360)
@@ -405,7 +421,7 @@ def lobes(fpath, arch, volume_limit, at_lift_limit):
 
     # allowed_volumes = np.concatenate([np.linspace(0.01, 0.25, 100), [0.25, 0.5, 0.75, 1.0]])
     allowed_at_lift = np.linspace(0.0, at_lift_limit, 11)
-    allowed_ramp_steepness = np.linspace(0.0, 12.0, 13)
+    allowed_ramp_steepness = np.linspace(0.0, 3.0, 16)
     allowed_ramp_pos = np.linspace(0.0, 6.0, 13)
     allowed_slf = [50.0, 100.0, 250.0, 500.0]
     allowed_base_radius = np.linspace(1.0, 3.0, 25)
@@ -441,7 +457,7 @@ def lobes(fpath, arch, volume_limit, at_lift_limit):
     button_e_formula = Button(ax_e_formula, 'toggle formula', color='black', hovercolor='orange')
 
     ax_ramp_steepness = plt.axes([center_sliders, 0.96, 0.2, 0.03])
-    slider_ramp_steepness = Slider(ax=ax_ramp_steepness, label='ramp steepness', valmin=0.0, valmax=12.0, valstep=allowed_ramp_steepness, valinit=cfg["ramp_steepness"], color='grey')
+    slider_ramp_steepness = Slider(ax=ax_ramp_steepness, label='ramp steepness', valmin=0.0, valmax=3.0, valstep=allowed_ramp_steepness, valinit=cfg["ramp_steepness"], color='grey')
     ax_ramp_pos = plt.axes([center_sliders, 0.94, 0.2, 0.03])
     slider_ramp_pos = Slider(ax=ax_ramp_pos, label='ramp position', valmin=0.0, valmax=6.0, valstep=allowed_ramp_pos, valinit=cfg["ramp_position"], color='grey')
     ax_sign_frn = plt.axes([center_sliders, 0.92, 0.2, 0.03])
@@ -498,6 +514,7 @@ def lobes(fpath, arch, volume_limit, at_lift_limit):
         cfg["ramp_position"] = slider_ramp_pos.val
         cfg["lift_significant_fraction"] = slider_sign_frn.val
         cfg["roller_tappet_radius"] = slider_rtr.val
+
         try:
             i_x, i_y, i_b, e_x, e_y, e_b = plot_all(ax, fpath, cfg, ivl, evl, ivo, ivc, evo, evc)
         except ValueError as e:
@@ -507,10 +524,10 @@ def lobes(fpath, arch, volume_limit, at_lift_limit):
     def save(event):
         nonlocal raw, cfg, other
         combined_config = {"cam_cfg": round_floats(cfg), **other}
-        header = f"lobes.py v{ver}"
+        header = f"lobes.py v{ver} | {c.ivd:.1f} {c.evd:.1f} LSA {c.lsa:.2f} ADV {c.adv:.2f} OVL {c.ovl:.1f}"
         with open(fpath, 'r+', encoding='utf-8') as f:
             file_contents = f.read()
-            file_contents = file_contents.replace(raw, json.dumps(combined_config, indent=2))
+            file_contents = file_contents.replace(raw, json.dumps(combined_config, indent=2, ensure_ascii=False, sort_keys=True, separators=(",", ": ")))
             file_contents = update_lobe_function(file_contents, i_x, i_y, i_b, i_node_name, header)
             file_contents = update_lobe_function(file_contents, e_x, e_y, e_b, e_node_name, header)
             f.seek(0)
