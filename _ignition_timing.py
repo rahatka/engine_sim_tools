@@ -8,7 +8,7 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from tkinter.filedialog import askopenfilename
 
-def parse_cfg(fpath) -> {}:
+def parse_cfg(fpath):
     cfg = {
         "es_version": "0.1.14a",
         "resolution": 16,

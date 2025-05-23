@@ -5,48 +5,52 @@
 
 /*
 {
+  "cam_cfg": {
+    "equal_base_radius": true,
+    "es_version": "0.1.14a",
+    "exhaust_at_lift": 0.381,
+    "exhaust_base_mult": 1.75,
+    "exhaust_cos": false,
+    "exhaust_sigma": 2.5,
+    "exhaust_trim": 0.8,
+    "exhaust_volume": 0.3,
+    "intake_at_lift": 0.381,
+    "intake_base_mult": 1.75,
+    "intake_cos": false,
+    "intake_sigma": 3.0,
+    "intake_trim": 0.8,
+    "intake_volume": 0.3,
+    "lift_significant_fraction": 250.0,
+    "ramp_position": 0.0,
+    "ramp_steepness": 1.0,
+    "resolution": 64,
+    "roller_tappet_radius": 0.0
+  },
   "flow_cfg": {
-    "resolution": 32,
-    "power_factor": 0.6,
+    "collector_area_coeff": 0.4,
+    "exhaust_flange_dia": null,
+    "exhaust_port_dia": null,
+    "exhaust_stem_dia": null,
+    "intake_port_dia": null,
+    "intake_runner_dia_mult": 1.0,
+    "intake_stem_dia": null,
+    "ir_to_er_ratio": 3.0,
     "max_power_rpm": 4500.0,
     "max_torque_rpm": 3000.0,
     "port_to_valve_area": 0.78,
-    "valve_to_stem_dia": 4.8,
-    "intake_runner_dia_mult": 1.0,
-    "ir_to_er_ratio": 3.0,
-    "exhaust_flange_dia": null,
+    "power_factor": 0.6,
     "primary_area_coeff": 1.1,
-    "collector_area_coeff": 0.4,
-    "smoothness": 2.0
-  },
-  "cam_cfg": {
-    "es_version": "0.1.14a",
-    "resolution": 64,
-    "intake_volume": 0.3,
-    "exhaust_volume": 0.3,
-    "intake_at_lift": 0.381,
-    "exhaust_at_lift": 0.381,
-    "intake_trim": 0.8,
-    "exhaust_trim": 0.8,
-    "intake_sigma": 3.0,
-    "exhaust_sigma": 2.5,
-    "intake_base_mult": 1.75,
-    "exhaust_base_mult": 1.75,
-    "intake_cos": false,
-    "exhaust_cos": false,
-    "equal_base_radius": true,
-    "ramp_steepness": 1.0,
-    "ramp_position": 0.0,
-    "lift_significant_fraction": 250.0,
-    "roller_tappet_radius": 0.0
+    "resolution": 32,
+    "smoothness": 2.0,
+    "valve_to_stem_dia": 4.8
   },
   "ign_cfg": {
-    "resolution": 16,
-    "start_rpm": 500,
-    "end_rpm": 3000,
     "end_deg": 20,
+    "end_rpm": 3000,
+    "exp_mode": 2,
     "flywheel": 2,
-    "exp_mode": 2
+    "resolution": 16,
+    "start_rpm": 500
   }
 }
 */
@@ -265,51 +269,10 @@ public node exhaust_lobe_profile {
         .add_sample(77.204 * units.deg, 0.000 * units.mm)
 }
 
-public node camshaft_builder {
-    output intake_cam_0: _intake_cam_0;
-    output exhaust_cam_0: _exhaust_cam_0;
-
-    camshaft _intake_cam_0(base_radius: 16.6 * units.mm, lobe_profile: intake_lobe_profile)
-    camshaft _exhaust_cam_0(base_radius: 16.6 * units.mm, lobe_profile: exhaust_lobe_profile)
-
-    _intake_cam_0
-        .add_lobe(ILC + 0 * rot)
-        .add_lobe(ILC + 1 * rot)
-        .add_lobe(ILC + 3 * rot)
-        .add_lobe(ILC + 2 * rot)
-    _exhaust_cam_0
-        .add_lobe(ELC + 0 * rot)
-        .add_lobe(ELC + 1 * rot)
-        .add_lobe(ELC + 3 * rot)
-        .add_lobe(ELC + 2 * rot)
-}
-
-private node add_flow_sample {
-    input lift;
-    input flow;
-    input this;
-    alias output __out: this;
-
-    this.add_sample(lift * units.mm, k_28inH2O(flow))
-}
-
-public node head {
-    // port_flow.py v1.2
-    // intake port area: 12.8 cm²; saturated lift: 9.80 mm
-    // exhaust port area: 7.5 cm²; saturated lift: 7.51 mm
-    // cylinder volume: 611.6 cm³ (37.3 CI); engine volume: 2.446 L (149.3 CI)
-    // 16 harmonic intake runner length: 19.6 cm; diameter: 4.0 cm
-    // primary length: 34.8 cm, area: 8.2 cm², diameter: 3.2 cm
-    // collector diameter: 4.1 cm, area: 13.2 cm²
-    // target power: 4500 RPM, power factor 0.60
-
-    input intake_camshaft;
-    input exhaust_camshaft;
-    input flip_display: false;
-    
-    alias output __out: head;
-    function intake_flow(0.306 * units.mm)
-    intake_flow
+public node intake_flow {
+    alias output __out: _intake_flow;
+    function _intake_flow(0.306 * units.mm)
+    _intake_flow
         .add_flow_sample(0.000, 0.0)
         .add_flow_sample(0.306, 10.2)
         .add_flow_sample(0.613, 20.0)
@@ -342,9 +305,12 @@ public node head {
         .add_flow_sample(8.887, 170.9)
         .add_flow_sample(9.194, 174.9)
         .add_flow_sample(9.500, 178.9)
+}
 
-    function exhaust_flow(0.306 * units.mm)
-    exhaust_flow
+public node exhaust_flow {
+    alias output __out: _exhaust_flow;
+    function _exhaust_flow(0.306 * units.mm)
+    _exhaust_flow
         .add_flow_sample(0.000, 0.0)
         .add_flow_sample(0.306, 8.7)
         .add_flow_sample(0.613, 17.0)
@@ -377,9 +343,59 @@ public node head {
         .add_flow_sample(8.887, 126.9)
         .add_flow_sample(9.194, 127.1)
         .add_flow_sample(9.500, 127.2)
+}
 
+intake_lobe_profile intake_lobe_profile()
+exhaust_lobe_profile exhaust_lobe_profile()
+
+intake_flow intake_flow()
+exhaust_flow exhaust_flow()
+
+public node camshaft_builder {
+    output intake_cam_0: _intake_cam_0;
+    output exhaust_cam_0: _exhaust_cam_0;
+
+    camshaft _intake_cam_0(base_radius: 16.6 * units.mm, lobe_profile: intake_lobe_profile)
+    camshaft _exhaust_cam_0(base_radius: 16.6 * units.mm, lobe_profile: exhaust_lobe_profile)
+
+    _intake_cam_0
+        .add_lobe(ILC + 0 * rot)
+        .add_lobe(ILC + 1 * rot)
+        .add_lobe(ILC + 3 * rot)
+        .add_lobe(ILC + 2 * rot)
+    _exhaust_cam_0
+        .add_lobe(ELC + 0 * rot)
+        .add_lobe(ELC + 1 * rot)
+        .add_lobe(ELC + 3 * rot)
+        .add_lobe(ELC + 2 * rot)
+}
+
+private node add_flow_sample {
+    input lift;
+    input flow;
+    input this;
+    alias output __out: this;
+
+    this.add_sample(lift * units.mm, k_28inH2O(flow))
+}
+
+public node head {
+    // port_flow.py v1.5
+    // intake port area: 12.8 cm²; saturated lift: 9.80 mm
+    // exhaust port area: 7.5 cm²; saturated lift: 7.51 mm
+    // cylinder volume: 611.6 cm³ (37.32 CI); engine volume: 2.446 L (149.28 CI)
+    // chamber volume: 84.9 cm³ (5.18 CI)
+    // 16 harmonic intake runner length: 19.6 cm; diameter: 4.0 cm
+    // primary length: 34.8 cm, area: 8.2 cm², diameter: 3.2 cm
+    // collector diameter: 4.1 cm, area: 13.2 cm²
+
+    input intake_camshaft;
+    input exhaust_camshaft;
+    input flip_display: false;
+    
+    alias output __out: head;
     generic_cylinder_head head(
-        chamber_volume: 74.583 * units.cc,
+        chamber_volume: 84.942 * units.cc,
         intake_runner_volume: 240.5 * units.cc,
         intake_runner_cross_section_area: 12.3 * units.cm2,
         exhaust_runner_volume: 80.2 * units.cc,
@@ -449,7 +465,7 @@ public node eng {
 
     piston_parameters piston_params(
         mass: piston_mass * units.g,
-        blowby: k_28inH2O(0.1),
+        blowby: k_28inH2O(0.029),
         compression_height: compression_height,
         wrist_pin_position: 0.0,
         displacement: 0.0
@@ -475,7 +491,7 @@ public node eng {
         runner_length: 19.6 * units.cm,
         intake_flow_rate: k_carb(163.1),
         idle_flow_rate: k_carb(0.02),
-        idle_throttle_plate_position: 0.993,
+        idle_throttle_plate_position: 0.995,
         runner_flow_rate: k_carb(81.5),
         velocity_decay: 0.05
     )

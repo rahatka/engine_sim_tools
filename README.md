@@ -1,26 +1,84 @@
 # engine_sim_tools
 
-python toolkit for AngeTheGreat Engine Simulator 2D
+Python toolkit for use with **AngeTheGreat Engine Simulator 2D**. This project provides tools to simulate engine port flow dynamics and calculate combustion geometry using reverse-engineered and empirical modeling.
 
-## port_flow
+## Features
 
-This script is designed to generate head flow functions based on basic engine parameters. By reading key data such as bore, stroke, valve diameters, and lifts from a file, the tool computes both intake and exhaust flow functions. It also generates performance-related parameters such as cross-sectional areas, runner flows, blowby, and more.
+- Head flow function generator (for both intake and exhaust)
+- Interactive GUI with sliders to visualize and tune flow parameters
+- Intelligent extrapolation and smoothing of flow curves
+- Accurate reverse-engineering of Jeep 4.0 cylinder head and runner geometry
+- Auto-generation of `.mr` files with flow functions, runner/collector dimensions, and more
+- Conversion utilities (mm ↔ inch, cc ↔ CI)
+- Runner geometry and harmonic resonance estimations
+- Exhaust system tuning helpers (primary and collector sizing)
+- Blow-by estimation
+- Friction torque estimation based on displacement
+- Supports `.mr` metadata extraction from embedded JSON configs
+- Batch mode via CLI (`-f` option for file path)
 
-Head flow calculations are based on a reverse-engineered head flow report from a Jeep 4.0 engine.
+## Script: `port_flow`
 
-The script features a simple GUI to interactively control engine parameters and display results.
+This module computes flow functions and geometric data based on engine configuration parameters read from `.mr` files. It visualizes results and exports them directly back into the `.mr`.
 
-An `.mr` file should have specific labels and sections for this script to work. Refer to the `reference_engine.mr` file for more details.
+### Input
 
-### Controls
+- `.mr` file with labeled values like:
+  ```
+  label bore(100)
+  label stroke(120)
+  label intake_valve_diameter(38)
+  label exhaust_valve_diameter(32)
+  ...
+  ```
+- JSON-style config under comment tag:
+  ```c
+  // {
+  //   "flow_cfg": {
+  //     "port_to_valve_area": 0.88,
+  //     "primary_area_coeff": 1.1,
+  //     ...
+  //   }
+  // }
+  ```
 
-Some parameters are immutable (bore, stroke, number of cylinders) and are parsed from labels. Other parameters, like ratios and coefficients, are mutable and are parsed from JSON comments. Mutable parameters are controlled via sliders.
+### Output
 
-+ `flow rate mult` - Restricts or multiplies intake and exhaust flow rates; does not affect head flows. A value of 0 is fully restricted, 2 is the maximum multiplier, and the default is 1.
-+ `port to valve area` - The ratio of _port_ / _valve cross-sectional area_, ranges from 0.75 to 1.
-+ `valve to stem dia` - The ratio of valve _head diameter_ / _stem diameter_, ranges from 3 to 7.
-+ `intake runner dia mult` - Adjusts the diameter of the intake runner, ranging from 0.8 to 1.2, where 1 leaves it unchanged.
-+ `intake to exhaust runner ratio` - The ratio of _intake runner volume_ / _exhaust runner volume_, ranges from 1 to 5.
-+ `primary area coeff` - The ratio of _primary cross-sectional area_ / _port cross-sectional area_, mainly affects sound.
-+ `collector area coeff` - The ratio of _exhaust collector area_ / _sum of all primary cross-sectional areas_, essentially controlling the size of the exhaust pipe.
-+ `smoothness` - Adjusts the smoothness of the head flow function.
+- Graphical plot of flow functions
+- Calculated properties (runner length, blow-by, valve geometry, volumes)
+- Updates `.mr` with new:
+  - `head` block
+  - `intake_flow` & `exhaust_flow` functions
+  - Flow rate tags and physical estimates
+
+## Controls (Sliders in GUI)
+
+| Parameter                     | Description                                                      |
+|------------------------------|------------------------------------------------------------------|
+| `flow rate mult`             | Multiplies flow rate (does not affect head flows)                |
+| `port to valve area`         | Ratio of port CSA to valve CSA (default 0.88)                    |
+| `valve to stem dia`          | Ratio of valve head diameter to stem (default 5)                 |
+| `intake runner dia mult`     | Multiplier for intake runner diameter                            |
+| `intake to exhaust runner ratio` | Ratio of intake runner vol to exhaust runner vol           |
+| `primary area coeff`         | Ratio of primary pipe area to exhaust port area                  |
+| `collector area coeff`       | Collector area divided by sum of primary areas                   |
+| `smoothness`                 | Gaussian blur intensity for head flow curve                      |
+
+## Examples
+
+```bash
+# Launch GUI and load engine
+python _port_flow_v.py -f my_engine.mr
+```
+
+## Calculations Based On
+
+- Jeep 4.0 flow data [PDF](https://cjclub.co.il/files/JEEP_4.0_PERFORMANCE_SPECS.pdf)
+- Runner theory from [exx.se tech](https://www.exx.se/techinfo/runners/runners.html)
+- Assumptions: CFM @ 28 inH₂O, harmonic tuning, sonic choke approximations
+
+## Dependencies
+
+```bash
+pip install numpy matplotlib scipy comment_parser parse regex
+```
