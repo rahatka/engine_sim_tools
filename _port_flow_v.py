@@ -444,7 +444,7 @@ def port_flow(fpath):
 
         c.intake_runner_volume = c.runner_area * c.runner_length
         c.exhaust_runner_volume = c.intake_runner_volume / cfg["ir_to_er_ratio"]
-        c.primary_length = ((850 * (360 - evo) / cfg["max_power_rpm"]) - 3) * 2.54 / 4
+        c.primary_length = ((850 * (360 - evo) / cfg["max_power_rpm"]) - 3) / 2
         # c.primary_area = c.cyl_volume_cc * cc_to_ci * (cfg["max_torque_rpm"] * cfg["primary_area_coeff"]) / 88200 * si_to_cm2
         c.primary_area = c.exhaust_port_area * number_of_exhaust_valves * cfg["primary_area_coeff"] / 100
         c.primary_diameter =  np.sqrt(c.primary_area / np.pi) * 2
@@ -506,7 +506,7 @@ def port_flow(fpath):
     // intake port area: {c.intake_port_area * number_of_intake_valves / 100:.1f} cm²; saturated lift: {c.intake_saturated_lift:.2f} mm
     // exhaust port area: {c.exhaust_port_area * number_of_exhaust_valves / 100:.1f} cm²; saturated lift: {c.exhaust_saturated_lift:.2f} mm
     // cylinder volume: {c.cyl_volume_cc:.1f} cm³ ({c.cyl_volume_cc / ci_to_cc:.2f} CI); engine volume: {c.engine_volume_l:.3f} L ({c.engine_volume_l * 1000 / ci_to_cc:.2f} CI)
-    // chamber volume: {chamber_vol_cc:.1f} cm³ ({chamber_vol_cc / ci_to_cc:.2f} CI)
+    // chamber volume: {chamber_vol_cc:.1f} cm³ ({chamber_vol_cc / ci_to_cc:.2f} CI); conrod/stroke {connecting_rod_length/stroke:.3f}
     // {c.harmonic} harmonic intake runner length: {c.runner_length:.1f} cm; diameter: {c.runner_diameter:.1f} cm
     // primary length: {c.primary_length:.1f} cm, area: {c.primary_area:.1f} cm², diameter: {c.primary_diameter:.1f} cm
     // collector diameter: {c.collector_diameter:.1f} cm, area: {c.collector_area:.1f} cm²

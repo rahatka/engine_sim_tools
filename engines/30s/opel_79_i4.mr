@@ -1,5 +1,6 @@
 // Engine Sim V0.1.14A
 // 1934 Opel 1397 26 @ 3400
+// 1935 Olympia 13237
 // Created by oror 2024
 
 /*
@@ -37,7 +38,7 @@
     "max_power_rpm": 3400.0,
     "max_torque_rpm": 1600.0,
     "port_to_valve_area": 0.8,
-    "power_factor": 0.8,
+    "power_factor": 0.95,
     "primary_area_coeff": 1.1,
     "resolution": 32,
     "smoothness": 2.0,
@@ -56,7 +57,7 @@
 */
 
 import "engine_sim.mr"
-import "_fuel_30.mr"
+import "../../fuel/30.mr"
 
 units units()
 constants constants()
@@ -464,10 +465,10 @@ public node head {
     // port_flow.py v1.5
     // intake port area: 6.7 cm²; saturated lift: 7.13 mm
     // exhaust port area: 5.2 cm²; saturated lift: 6.29 mm
-    // cylinder volume: 322.1 cm³ (19.7 CI); engine volume: 1.288 L (78.6 CI)
-    // chamber volume: 64.4 cm³ (3.9 CI)
+    // cylinder volume: 322.1 cm³ (19.65 CI); engine volume: 1.288 L (78.61 CI)
+    // chamber volume: 64.4 cm³ (3.93 CI); conrod/stroke 2.022
     // 32 harmonic intake runner length: 13.7 cm; diameter: 2.5 cm
-    // primary length: 47.3 cm, area: 5.8 cm², diameter: 2.7 cm
+    // primary length: 37.2 cm, area: 5.8 cm², diameter: 2.7 cm
     // collector diameter: 3.4 cm, area: 9.2 cm²
 
     input intake_camshaft;
@@ -566,10 +567,10 @@ public node eng {
         plenum_volume: 0.6 * units.L,
         plenum_cross_section_area: 9.8 * units.cm2,
         runner_length: 13.7 * units.cm,
-        intake_flow_rate: k_carb(69.6),
+        intake_flow_rate: k_carb(75.4),
         idle_flow_rate: k_carb(0.02),
         idle_throttle_plate_position: 0.990,
-        runner_flow_rate: k_carb(34.8),
+        runner_flow_rate: k_carb(37.7),
         velocity_decay: 0.05
     )
 
@@ -619,11 +620,11 @@ private node es0{
     float _pl3 ((2.5 * em_unit) * units.mm)
 
     exhaust_system_parameters es_params0(
-        outlet_flow_rate: k_carb(110.1),
+        outlet_flow_rate: k_carb(124.0),
         collector_cross_section_area: 9.2 * units.cm2,
         length: exhaust_pipe_length_0 * units.cm,
-        primary_tube_length: 47.3 * units.cm,
-        primary_flow_rate: k_carb(55.1),
+        primary_tube_length: 37.2 * units.cm,
+        primary_flow_rate: k_carb(62.0),
         velocity_decay: 1.0,
         volume: exhaust_volume_0 * units.L
     )
@@ -631,21 +632,21 @@ private node es0{
     exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_56.wav", volume: 0.00025))
 }
 
-// Универсал-1
+// 1935 P4
 public node veh {
     alias output __out: vehicle;
-    label car_mass(2050.0)
+    label car_mass(920.0) // 865 curb
     vehicle vehicle(
         mass: car_mass * units.kg,
-        drag_coefficient: 0.5,
-        cross_sectional_area: (1700 * units.mm) * (1600 * units.mm), // ?
-        diff_ratio: 4.85 * 6.15,
-        tire_radius: (1017.0 / 2) * units.mm,
+        drag_coefficient: 0.45, // ?
+        cross_sectional_area: (1430 * units.mm) * (1540 * units.mm),
+        diff_ratio: 5.14,
+        tire_radius: (682.0 / 2) * units.mm, // 5.00x16
         rolling_resistance: 0.05 * car_mass * 9.81
         )
 }
 
-// Универсал-1
+// 1935 P4
 private node trn {
     alias output __out:
         transmission(
@@ -656,9 +657,10 @@ private node trn {
             clutch_damping: 1.0,
             simulate_flex: true
         )
-        .add_gear(2.25)
-        .add_gear(1.60)
-        .add_gear(1.08);
+        .add_gear(3.91)
+        .add_gear(2.47)
+        .add_gear(1.49)
+        .add_gear(1.00);
 }
 
 run(
