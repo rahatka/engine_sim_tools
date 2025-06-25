@@ -5,6 +5,9 @@ import regex
 import parse
 import os
 import json
+import _math
+import _math_artic1
+import _math_artic2
 from comment_parser import comment_parser
 from tkinter.filedialog import askopenfilename
 
@@ -48,6 +51,7 @@ def parse_cfg(fpath):
         "cyl_per_bank": None,
         "psi": None,
         "sigma": None,
+        "comp_R1": None,
     }
 
     comments = comment_parser.extract_comments(fpath, mime='text/x-c')
@@ -87,8 +91,7 @@ def calculate_S(c, theta_deg, L1, R1, psi, sigma):
     alpha = np.arcsin((c.R * np.sin(theta)) / c.L)
     beta = np.arcsin((c.R * np.sin(sigma - theta) + R1 * np.sin(sigma - psi + alpha)) / L1)
     
-    S = c.R * np.cos(sigma - theta) + R1 * np.cos(sigma - psi + alpha) + L1 * np.cos(beta)
-    return S
+    return c.R * np.cos(sigma - theta) + R1 * np.cos(sigma - psi + alpha) + L1 * np.cos(beta)
 
 def find_optimal_L1_for_S(c, psi, sigma):
     def error_function(L1_guess):
@@ -157,10 +160,11 @@ def calculate(c, psi, sigma):
     cyl_displacement = cyl_vol(c.bore, y)
     delta_S_displacement = cyl_vol(c.bore, delta_S)
     calc_cr = (cyl_displacement / (c.chamber_vol - delta_S_displacement) + 1)
+
+    if theta_at_max_S > 180:
+        theta_at_max_S -= 360
     delta_sigma = theta_at_max_S - np.degrees(sigma)
-    if delta_sigma > 180:
-        delta_sigma -= 360
-    print(f"y {y:.3f} mm Δy {y - c.stroke:.3f} mm ")
+    print(f"y {y:.3f} mm Δy {y - c.stroke:.3f} mm")
     print(f"max S {max_S:.3f} mm at {theta_at_max_S:.1f}° Δσ {delta_sigma:.1f}° ΔS {delta_S:.3f} mm")
     
     c.displacement += cyl_displacement * c.cyl_per_bank
@@ -181,7 +185,7 @@ def calculate(c, psi, sigma):
     # print(f"optimal R1 when L1 is {L1} mm: {optimal_R1:.3f} mm")
     # print(f"optimal ψ for max_S: {optimal_psi:.1f}°\n")
 
-def artic(fpath):
+def artic(fpath, graphs):
     if fpath is None:
         fpath = askopenfilename()
     if fpath is None or fpath == '':
@@ -194,7 +198,7 @@ def artic(fpath):
     with open(fpath, 'r+', encoding='utf-8') as f:
         mr_content = f.read()
 
-        c.bore = parse.search("\nlabel bore({:f})", mr_content)[0]
+        c.bore = parse.search("\nlabel bore({:f})", mr_content)[0] # type: ignore
         c.stroke = parse.search("\nlabel stroke({:f})", mr_content)[0]
         c.cr = parse.search("\nlabel compression_ratio({:f})", mr_content)[0]
         c.L = parse.search("\nlabel con_rod({:f})", mr_content)[0]
@@ -205,14 +209,40 @@ def artic(fpath):
         c.sigma_deg = cfg["sigma"]
         c.chamber_vol = cyl_vol(c.bore, c.stroke) / (c.cr - 1)
         c.cyl_per_bank = cfg["cyl_per_bank"]
+        rot = 360 / cfg["num_of_banks"]
 
         if c.psi_deg is None:
-            rot = 360 / cfg["num_of_banks"]
-            c.psi_deg = [i * rot for i in range(1, cfg["num_of_banks"] + 1)]
+            c.psi_deg = [i * rot for i in range(1, cfg["num_of_banks"])]
 
         if c.sigma_deg is None:
-            rot = 360 / cfg["num_of_banks"]
-            c.sigma_deg = [i * rot for i in range(1, cfg["num_of_banks"] + 1)]
+            c.sigma_deg = [i * rot for i in range(1, cfg["num_of_banks"])]
+
+        if graphs:
+            rpm = 2000
+            S, V, J = [], [], []
+            s,v,j = _math.svj(c.stroke / 2, c.L, rpm)
+            S.append(s)
+            V.append(v)
+            J.append(j)
+            for i, psi in enumerate(c.psi_deg):
+                R = c.stroke / 2
+                r = cfg["comp_R1"][i]
+                # r = c.R1
+                L = c.L
+                l = c.L1
+                gamma = c.sigma_deg[i]
+                if psi % rot == 0:
+                    s,v,j = _math_artic1.svj(R, L, r, l, gamma, rpm)
+                    S.append(s)
+                    V.append(v)
+                    J.append(j)
+                else:
+                    s,v,j = _math_artic2.svj(R, L, r, l, gamma, psi, rpm)
+                    S.append(s)
+                    V.append(v)
+                    J.append(j)
+            _math.graphs(S, V, J)
+            return
 
         c.displacement = cyl_vol(c.bore, c.stroke) * c.cyl_per_bank
         c.crs.append(c.cr)
@@ -237,11 +267,13 @@ def artic(fpath):
         f.truncate()
         f.write(mr_content)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog = 'calc artic')
     parser.add_argument('-f', '--file', type=str, help='path to your engines (.mr)')
+    parser.add_argument('-g', '--graphs', action='store_true', help='make graphs')
     if os.name == 'nt':
         from ctypes import windll
         windll.shcore.SetProcessDpiAwareness(1)
     args = parser.parse_args()
-    artic(args.file)
+    artic(args.file, args.graphs)

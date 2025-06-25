@@ -52,39 +52,13 @@ def round_floats(o):
         return [round_floats(x) for x in o]
     return o
 
-def calculate_real_stroke(stroke, con_rod_length, offset, angle_increment=0.1):
-    crank_radius = stroke / 2
-    max_displacement = -float('inf')
-    min_displacement = float('inf')
-    angle = 0
-    while angle <= 360:
-        angle_rad = np.radians(angle)
-        try:
-            piston_position = crank_radius * np.cos(angle_rad) + np.sqrt(con_rod_length**2 - (offset + crank_radius * np.sin(angle_rad))**2)
-            max_displacement = max(max_displacement, piston_position)
-            min_displacement = min(min_displacement, piston_position)
-        except ValueError:
-            pass
-        angle += angle_increment
-    return max_displacement - min_displacement
-
-def piston_position(crank_angle, crank_radius, con_rod_length, offset):
-    angle_rad = np.radians(crank_angle)
-    try:
-        position = crank_radius * np.cos(angle_rad) + np.sqrt(con_rod_length**2 - (offset + crank_radius * np.sin(angle_rad))**2)
-    except ValueError:
-        position = -float('inf')
-    return position
-
-def find_tdc_angle(stroke, con_rod_length, offset):
-    crank_radius = stroke / 2
-
-    def negative_piston_position(crank_angle):
-        return -piston_position(crank_angle, crank_radius, con_rod_length, offset)
-    
-    result = minimize_scalar(negative_piston_position, bounds=(0, 360), method='bounded')
-    tdc_angle = result.x
-    return 360 - tdc_angle
+def calculate_desaxe_params(stroke, con_rod_length, offset):
+    R = stroke / 2
+    lam = R / con_rod_length
+    k = offset/R
+    S = R * ((np.sqrt((1 / lam + 1)**2 - k**2)) - np.sqrt((1 / lam - 1)**2 - k**2))
+    tdc = np.degrees(np.arcsin(lam * k / (1 + lam)))
+    return S, tdc
 
 
 class Calc:
@@ -294,8 +268,8 @@ def port_flow(fpath):
         offset = p_oft[0]
 
     if offset != 0:
-        real_stroke = calculate_real_stroke(stroke, connecting_rod_length, offset)
-        print(f"TDC comp: {find_tdc_angle(stroke, connecting_rod_length, offset):.3f}, calculated stroke: {real_stroke:.3f}")
+        real_stroke, tdc = calculate_desaxe_params(stroke, connecting_rod_length, offset)
+        print(f"TDC comp: {tdc:.3f}, calculated stroke: {real_stroke:.3f}")
     else:
         real_stroke = stroke
 
