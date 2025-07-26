@@ -21,7 +21,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.optimize import minimize_scalar
 from tkinter.filedialog import askopenfilename
 
-ver = "1.5"
+ver = "1.6"
 json_pattern = regex.compile(r'\{(?:[^{}]|(?R))*\}')
 
 cc_to_ci = np.float64(0.0610237441)
@@ -29,19 +29,23 @@ ci_to_cc = np.float64(16.387064069264)
 si_to_cm2 = np.float64(6.451599929)
 quarter_pi = np.pi / 4.0
 
+
 def draw_circle(ax, center, radius, color='blue', linestyle='-'):
     circle = plt.Circle(center, radius, color=color, fill=False, linewidth=1, linestyle=linestyle)
     ax.add_artist(circle)
 
+
 def setup_ax(ax):
     ax.grid(color='dimgrey', linewidth=0.3)
     ax.tick_params(colors='darkgrey')
+
 
 def remove_ticks_labels(ax):
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_xticklabels([])
     ax.set_yticklabels([])
+
 
 def round_floats(o):
     if isinstance(o, float):
@@ -51,6 +55,7 @@ def round_floats(o):
     if isinstance(o, (list, tuple)):
         return [round_floats(x) for x in o]
     return o
+
 
 def calculate_desaxe_params(stroke, con_rod_length, offset):
     R = stroke / 2

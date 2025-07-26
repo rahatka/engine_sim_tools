@@ -113,7 +113,7 @@ def svj(R, L, rpm, offset=0):  # path, velocity, acceleration
     return S, V, J
 
 
-def graphs(S, V, J):
+def graphs(S, V, J, rpm):
     # color_seq = ['w', 'r', 'g', 'b', 'indianred', 'springgreen', 'cornflowerblue', 'mistyrose', 'lightgreen', 'skyblue', 'grey']
     color_seq = [
         'white',
@@ -153,7 +153,7 @@ def graphs(S, V, J):
         plt.plot(alpha_deg, v, label=f"Piston {i+1}", color=color_seq[i], linewidth=linewidth, zorder=-i)
     plt.xlabel("Crank Angle (°)")
     plt.ylabel("Piston Speed (m/s)")
-    plt.title("Piston Speed $V_p$")
+    plt.title(f"Piston Speed $V_p$ at {rpm} RPM")
     plt.xticks(np.arange(0, 361, 40))
     plt.legend()
     plt.grid(True, color='gray', linestyle='--', linewidth=0.5)
@@ -163,10 +163,10 @@ def graphs(S, V, J):
     plt.figure(figsize=(10, 5))
     for i, j in enumerate(J):
         linewidth = 0.75 if i == 0 else 0.5
-        plt.plot(alpha_deg, ms2_to_g(j), label=f"Piston {i+1}", color=color_seq[i], linewidth=linewidth, zorder=-i)
+        plt.plot(alpha_deg, j, label=f"Piston {i+1}", color=color_seq[i], linewidth=linewidth, zorder=-i)
     plt.xlabel("Crank Angle (°)")
-    plt.ylabel("Piston Acceleration (g)")
-    plt.title("Piston Acceleration $J_p$")
+    plt.ylabel("Piston Acceleration (m/s²)")
+    plt.title(f"Piston Acceleration $J_p$ at {rpm} RPM")
     plt.xticks(np.arange(0, 361, 40))
     plt.legend()
     plt.grid(True, color='gray', linestyle='--', linewidth=0.5)

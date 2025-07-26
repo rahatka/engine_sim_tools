@@ -14,8 +14,15 @@ from tkinter.filedialog import askopenfilename
 theta_values = np.linspace(0, 360, 3601)
 json_pattern = regex.compile(r'\{(?:[^{}]|(?R))*\}')
 
+
+def neg_mod(x, mod):
+    r = x % mod
+    return r if x >= 0 or r == 0 else r - mod
+
+
 class Calc:
     def __init__(self):
+        self.redline = None
         self.bore = None
         self.stroke = None
         self.cr = None
@@ -164,6 +171,7 @@ def calculate(c, psi, sigma):
     if theta_at_max_S > 180:
         theta_at_max_S -= 360
     delta_sigma = theta_at_max_S - np.degrees(sigma)
+    delta_sigma = neg_mod(delta_sigma, 360)
     print(f"y {y:.3f} mm Δy {y - c.stroke:.3f} mm")
     print(f"max S {max_S:.3f} mm at {theta_at_max_S:.1f}° Δσ {delta_sigma:.1f}° ΔS {delta_S:.3f} mm")
     
@@ -185,7 +193,7 @@ def calculate(c, psi, sigma):
     # print(f"optimal R1 when L1 is {L1} mm: {optimal_R1:.3f} mm")
     # print(f"optimal ψ for max_S: {optimal_psi:.1f}°\n")
 
-def artic(fpath, graphs):
+def artic(fpath, graphs, common_r1):
     if fpath is None:
         fpath = askopenfilename()
     if fpath is None or fpath == '':
@@ -205,6 +213,7 @@ def artic(fpath, graphs):
         c.L1 = parse.search("\nlabel L1({:f})", mr_content)[0]
         c.R = c.stroke / 2
         c.R1 = parse.search("\nlabel R1({:f})", mr_content)[0]
+        c.redline = parse.search("\nlabel redline({:f})", mr_content)[0]
         c.psi_deg = cfg["psi"]
         c.sigma_deg = cfg["sigma"]
         c.chamber_vol = cyl_vol(c.bore, c.stroke) / (c.cr - 1)
@@ -218,30 +227,28 @@ def artic(fpath, graphs):
             c.sigma_deg = [i * rot for i in range(1, cfg["num_of_banks"])]
 
         if graphs:
-            rpm = 2000
             S, V, J = [], [], []
-            s,v,j = _math.svj(c.stroke / 2, c.L, rpm)
+            s,v,j = _math.svj(c.stroke / 2, c.L, c.redline)
             S.append(s)
             V.append(v)
             J.append(j)
             for i, psi in enumerate(c.psi_deg):
                 R = c.stroke / 2
-                r = cfg["comp_R1"][i]
-                # r = c.R1
+                r = c.R1 if common_r1 else cfg["comp_R1"][i]
                 L = c.L
                 l = c.L1
                 gamma = c.sigma_deg[i]
                 if psi % rot == 0:
-                    s,v,j = _math_artic1.svj(R, L, r, l, gamma, rpm)
+                    s,v,j = _math_artic1.svj(R, L, r, l, gamma, c.redline)
                     S.append(s)
                     V.append(v)
                     J.append(j)
                 else:
-                    s,v,j = _math_artic2.svj(R, L, r, l, gamma, psi, rpm)
+                    s,v,j = _math_artic2.svj(R, L, r, l, gamma, psi, c.redline)
                     S.append(s)
                     V.append(v)
                     J.append(j)
-            _math.graphs(S, V, J)
+            _math.graphs(S, V, J, c.redline)
             return
 
         c.displacement = cyl_vol(c.bore, c.stroke) * c.cyl_per_bank
@@ -272,8 +279,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog = 'calc artic')
     parser.add_argument('-f', '--file', type=str, help='path to your engines (.mr)')
     parser.add_argument('-g', '--graphs', action='store_true', help='make graphs')
+    parser.add_argument('-r', '--common_r1', action='store_true', help='use single R1')
     if os.name == 'nt':
         from ctypes import windll
         windll.shcore.SetProcessDpiAwareness(1)
     args = parser.parse_args()
-    artic(args.file, args.graphs)
+    artic(args.file, args.graphs, args.common_r1)
