@@ -21,7 +21,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.optimize import minimize_scalar
 from tkinter.filedialog import askopenfilename
 
-ver = "1.6"
+ver = "1.7"
 json_pattern = regex.compile(r'\{(?:[^{}]|(?R))*\}')
 
 cc_to_ci = np.float64(0.0610237441)
@@ -249,6 +249,7 @@ def port_flow(fpath):
     p_evo = parse.search("\nlabel EVO({:f} * units.deg)", mr_content)
     p_oft = parse.search("\nlabel offset({:f})", mr_content)
     p_crl = parse.search("\nlabel con_rod({:f})", mr_content)
+    p_vee = parse.search("\nlabel vee({:f} * units.deg)", mr_content)
 
     number_of_intake_valves = p_inum[0]
     intake_head_diameter = p_ivd[0]
@@ -275,6 +276,9 @@ def port_flow(fpath):
     if offset != 0:
         real_stroke, tdc = calculate_desaxe_params(stroke, connecting_rod_length, offset)
         print(f"TDC comp: {tdc:.3f}, calculated stroke: {real_stroke:.3f}")
+        if p_vee is not None:
+            vee = np.radians(p_vee[0])
+            print(f"shifts: x {offset * np.cos(vee / 2):.3f}, y {offset * np.sin(vee / 2):.3f}")
     else:
         real_stroke = stroke
 
@@ -480,12 +484,13 @@ def port_flow(fpath):
     def save(val):
         nonlocal c, raw, cfg, other
         chamber_vol_cc = c.cyl_volume_cc / (compression_ratio - 1)
+        nacc = (bore / 25.4)**2 * number_of_cylinders / 2.5
         head_flow = f"""{{
     // port_flow.py v{ver}
     // intake port area: {c.intake_port_area * number_of_intake_valves / 100:.1f} cm²; saturated lift: {c.intake_saturated_lift:.2f} mm
     // exhaust port area: {c.exhaust_port_area * number_of_exhaust_valves / 100:.1f} cm²; saturated lift: {c.exhaust_saturated_lift:.2f} mm
     // cylinder volume: {c.cyl_volume_cc:.1f} cm³ ({c.cyl_volume_cc / ci_to_cc:.2f} CI); engine volume: {c.engine_volume_l:.3f} L ({c.engine_volume_l * 1000 / ci_to_cc:.2f} CI)
-    // chamber volume: {chamber_vol_cc:.1f} cm³ ({chamber_vol_cc / ci_to_cc:.2f} CI); conrod/stroke {connecting_rod_length/stroke:.3f}
+    // chamber volume: {chamber_vol_cc:.1f} cm³ ({chamber_vol_cc / ci_to_cc:.2f} CI); conrod/stroke {connecting_rod_length/stroke:.3f}; N.A.C.C. {nacc:.2f}
     // {c.harmonic} harmonic intake runner length: {c.runner_length:.1f} cm; diameter: {c.runner_diameter:.1f} cm
     // primary length: {c.primary_length:.1f} cm, area: {c.primary_area:.1f} cm², diameter: {c.primary_diameter:.1f} cm
     // collector diameter: {c.collector_diameter:.1f} cm, area: {c.collector_area:.1f} cm²
