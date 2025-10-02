@@ -77,7 +77,6 @@ def setup_ax(ax):
 json_pattern = regex.compile(r'\{(?:[^{}]|(?R))*\}')
 def parse_cfg(fpath):
     cfg = {
-        "es_version": "0.1.14a",
         "resolution": 64,
         "intake_volume": 0.5,
         "exhaust_volume": 0.5,
@@ -250,7 +249,7 @@ def create_profile(duration, lift, trim_factor, sigma, vol, res, at_lift, ramp_s
     return x, y
 
 
-def create_valve_path_flat_tappet(xs: np.array, ys: np.array, base: float) -> np.array:
+def create_valve_path_flat_follower(xs: np.array, ys: np.array, base: float) -> np.array:
     radians_xs = np.radians(xs)
     lifts_with_base = base + ys
     ry = np.empty_like(xs)
@@ -260,7 +259,7 @@ def create_valve_path_flat_tappet(xs: np.array, ys: np.array, base: float) -> np
     return ry
 
 
-def create_valve_path_roller_tappet(xs: np.array, ys: np.array, base: float, roller_base: float) -> np.array:
+def create_valve_path_roller_follower(xs: np.array, ys: np.array, base: float, roller_base: float) -> np.array:
     radians_xs = np.radians(xs)
     lifts_with_base = base + ys
     ry = np.empty_like(xs)
@@ -295,11 +294,11 @@ def plot_all(ax, fpath, cfg, int_lift, exh_lift, ivo, ivc, evo, evc):
                              cfg["exhaust_at_lift"], cfg["ramp_steepness"], cfg["ramp_position"], cfg["lift_significant_fraction"], cfg["exhaust_cos"])
     
     if cfg["roller_tappet_radius"] is None or cfg["roller_tappet_radius"] == 0:
-        i_vly = create_valve_path_flat_tappet(i_x, i_y, i_base)
-        e_vly = create_valve_path_flat_tappet(e_x, e_y, e_base)
+        i_vly = create_valve_path_flat_follower(i_x, i_y, i_base)
+        e_vly = create_valve_path_flat_follower(e_x, e_y, e_base)
     else:
-        i_vly = create_valve_path_roller_tappet(i_x, i_y, i_base, rtr)
-        e_vly = create_valve_path_roller_tappet(e_x, e_y, e_base, rtr)
+        i_vly = create_valve_path_roller_follower(i_x, i_y, i_base, rtr)
+        e_vly = create_valve_path_roller_follower(e_x, e_y, e_base, rtr)
 
     i_adv_dur = plot(ax, i_x, i_y, i_vly, i_c, i_base, int_dur, rtr, "intake", cfg["intake_at_lift"], "skyblue")
     e_adv_dur = plot(ax, e_x, e_y, e_vly, e_c, e_base, exh_dur, rtr, "exhaust", cfg["exhaust_at_lift"], "orange")

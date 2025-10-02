@@ -155,6 +155,20 @@ def find_optimal_L1_for_CR(c, target_CR, psi, sigma):
     result = opt.minimize_scalar(error_function, bounds=(c.L1 - 10, c.L1 + 10), method='bounded')
     return result.x
 
+def find_optimal_psi_for_CR(c, target_CR, psi, sigma):
+    def error_function(psi_guess):
+        S_values = [calculate_S(c, theta, c.L1, c.R1, psi_guess, sigma) for theta in theta_values]
+        max_S = max(S_values)
+        y = max_S - min(S_values)
+        delta_S = max_S - c.L - c.R
+        cyl_displacement = cyl_vol(c.bore, y)
+        delta_S_displacement = cyl_vol(c.bore, delta_S)
+        calculated_CR = cyl_displacement / (c.chamber_vol - delta_S_displacement) + 1
+        return abs(calculated_CR - target_CR)
+
+    result = opt.minimize_scalar(error_function, bounds=(psi - 0.5, psi + 0.5), method='bounded')
+    return result.x
+
 def calculate(c, psi, sigma):
     S_values = [calculate_S(c, theta, c.L1, c.R1, psi, sigma) for theta in theta_values]
 
@@ -166,20 +180,21 @@ def calculate(c, psi, sigma):
     delta_S = max_S - c.L - c.R
     cyl_displacement = cyl_vol(c.bore, y)
     delta_S_displacement = cyl_vol(c.bore, delta_S)
-    calc_cr = (cyl_displacement / (c.chamber_vol - delta_S_displacement) + 1)
+    artic_chamber_vol = c.chamber_vol - delta_S_displacement
+
+    calc_cr = (cyl_displacement / (artic_chamber_vol) + 1)
 
     if theta_at_max_S > 180:
         theta_at_max_S -= 360
     delta_sigma = theta_at_max_S - np.degrees(sigma)
     delta_sigma = neg_mod(delta_sigma, 360)
-    print(f"y {y:.3f} mm Δy {y - c.stroke:.3f} mm")
-    print(f"max S {max_S:.3f} mm at {theta_at_max_S:.1f}° Δσ {delta_sigma:.1f}° ΔS {delta_S:.3f} mm")
     
     c.displacement += cyl_displacement * c.cyl_per_bank
     artic_tdc = 90 + np.degrees(sigma) - np.degrees(np.arccos(c.R * np.sin(sigma) / c.L))
     # optimal_L1 = find_optimal_L1_for_S(c, psi, sigma)
     optimal_R1 = find_optimal_R1_for_CR(c, c.cr, psi, sigma)
     optimal_L1 = find_optimal_L1_for_CR(c, c.cr, psi, sigma)
+    optimal_psi = find_optimal_psi_for_CR(c, c.cr, psi, sigma)
     # optimal_psi = find_optimal_psi_for_S(c, theta_at_max_S, sigma, artic_tdc)
 
     c.comp_L1.append(optimal_L1)
@@ -187,8 +202,10 @@ def calculate(c, psi, sigma):
     c.crs.append(calc_cr)
     c.comp_ign.append(delta_sigma)
 
-    print(f"CR {calc_cr:.3f} opt L1 {optimal_L1:.3f} opt R1 {optimal_R1:.3f}")
-    print(f"bank {np.degrees(sigma):.3f}° avg-optimized ψ {(np.degrees(sigma) + artic_tdc) / 2:.2f}° artic TDC {artic_tdc:.3f}°")
+    print(f"// stroke={y:.3f} mm Δstroke={y - c.stroke:.3f} mm")
+    print(f"// max S={max_S:.3f} mm at {theta_at_max_S:.1f}°, Δσ={delta_sigma:.1f}°, ΔS={delta_S:.3f} mm, CR={calc_cr:.3f}")
+    print(f"// CR-optimal params: L1={optimal_L1:.3f} or R1={optimal_R1:.3f} or ψ={np.degrees(optimal_psi):.3f}°")
+    print(f"// bank {np.degrees(sigma):.3f}°, avg-optimized ψ={(np.degrees(sigma) + artic_tdc) / 2:.2f}°, artic TDC={artic_tdc:.3f}°")
     # print(f"optimal L1 when R1 is {R1} mm: {optimal_L1:.3f} mm")
     # print(f"optimal R1 when L1 is {L1} mm: {optimal_R1:.3f} mm")
     # print(f"optimal ψ for max_S: {optimal_psi:.1f}°\n")
@@ -254,13 +271,13 @@ def artic(fpath, graphs, common_r1):
         c.displacement = cyl_vol(c.bore, c.stroke) * c.cyl_per_bank
         c.crs.append(c.cr)
         for i in range(cfg["num_of_banks"] - 1):
-            print(f"\ncalculating bank {i + 2}")
+            print(f"\n// calculating bank {i + 2}")
             calculate(c, np.radians(c.psi_deg[i]), np.radians(c.sigma_deg[i]))
         td = c.displacement / 1_000_000
         td_ci = c.displacement / 1000 * cc_to_ci
-        print(f"\n// actual displacement: {td:.3f} L {td_ci:.2f} CI avg CR: {np.mean(c.crs):.3f}")
-        print(f"CR-optimal R1 avg {np.mean(c.comp_R1):.3f}")
-        print(f"CR-optimal L1 avg {np.mean(c.comp_L1):.3f}\n")
+        print(f"\n// CR-optimal R1 avg {np.mean(c.comp_R1):.3f}")
+        print(f"// CR-optimal L1 avg {np.mean(c.comp_L1):.3f}\n")
+        print(f"// actual displacement: {td:.3f} L {td_ci:.2f} CI avg CR: {np.mean(c.crs):.3f}")
 
         cfg["comp_R1"] = c.comp_R1
         cfg["comp_ign"] = c.comp_ign
