@@ -128,6 +128,7 @@ label ILC((rot180 - IVO + IVC) / 2.0 + rot360)
 label ELC((rot180 - EVO + EVC) / 2.0 + rot180)
 
 label con_rod_mass(5200.0)
+label slave_rod_mass(850) // ?
 label piston_mass(2000.0) // ?
 label crank_mass(50.0) // ? kg
 label flywheel_mass(20.0) // kg
@@ -386,7 +387,7 @@ private node add_lobes {
 
 public node bank_builder {
     input var;
-    input crankshaft;
+    input rods;
     input incline;
     input phasing;
     input ignition;
@@ -454,8 +455,8 @@ public node bank_builder {
     _b0
     .add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj0,
+            connecting_rod: rods.cr0,
+            rod_journal: rods.rj0,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl0 + sh,
@@ -463,8 +464,8 @@ public node bank_builder {
         )
     .add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj1,
+            connecting_rod: rods.cr1,
+            rod_journal: rods.rj1,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl1 + sh,
@@ -472,8 +473,8 @@ public node bank_builder {
         )
     .add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj2,
+            connecting_rod: rods.cr2,
+            rod_journal: rods.rj2,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl2 + sh,
@@ -481,8 +482,8 @@ public node bank_builder {
         )
     .add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj3,
+            connecting_rod: rods.cr3,
+            rod_journal: rods.rj3,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl3 + sh,
@@ -490,8 +491,8 @@ public node bank_builder {
         )
     .add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj4,
+            connecting_rod: rods.cr4,
+            rod_journal: rods.rj4,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl4 + sh,
@@ -499,8 +500,8 @@ public node bank_builder {
         )
     .add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj5,
+            connecting_rod: rods.cr5,
+            rod_journal: rods.rj5,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl5 + sh,
@@ -577,7 +578,7 @@ public node crank {
         throw: (stroke / 2.0) * units.mm,
         flywheel_mass: flywheel_mass * units.kg,
         mass: crank_mass * units.kg,
-        friction_torque: 65.1 * units.Nm,
+        friction_torque: 45.7 * units.Nm,
         moment_of_inertia: crank_moment + flywheel_moment + other_moment,
         tdc: 0.0
     )
@@ -596,6 +597,97 @@ public node crank {
         .add_rod_journal(_rj3)
         .add_rod_journal(_rj4)
         .add_rod_journal(_rj5)
+}
+
+public node r0 {
+    input rods;
+    output cr0: rods.cr0_1;
+    output cr1: rods.cr1_0;
+    output cr2: rods.cr2_1;
+    output cr3: rods.cr3_0;
+    output cr4: rods.cr4_1;
+    output cr5: rods.cr5_0;
+
+    output rj0: rods.rj0_1;
+    output rj1: rods.rj1_0;
+    output rj2: rods.rj2_1;
+    output rj3: rods.rj3_0;
+    output rj4: rods.rj4_1;
+    output rj5: rods.rj5_0;
+}
+
+public node r1 {
+    input rods;
+    output cr0: rods.cr0_0;
+    output cr1: rods.cr1_1;
+    output cr2: rods.cr2_0;
+    output cr3: rods.cr3_1;
+    output cr4: rods.cr4_0;
+    output cr5: rods.cr5_1;
+
+    output rj0: rods.rj0_0;
+    output rj1: rods.rj1_1;
+    output rj2: rods.rj2_0;
+    output rj3: rods.rj3_1;
+    output rj4: rods.rj4_0;
+    output rj5: rods.rj5_1;
+}
+
+public node rods {
+    input crank;
+    output cr0_0: mcr0; output cr1_0: mcr1; output cr2_0: mcr2; output cr3_0: mcr3; output cr4_0: mcr4; output cr5_0: mcr5;
+    output rj0_0: crank.rj0; output rj1_0: crank.rj1; output rj2_0: crank.rj2; output rj3_0: crank.rj3; output rj4_0: crank.rj4; output rj5_0: crank.rj5;
+    output rj0_1: sj0_0; output rj1_1: sj1_0; output rj2_1: sj2_0; output rj3_1: sj3_0; output rj4_1: sj4_0; output rj5_1: sj5_0;
+    output cr0_1: sr0_0; output cr1_1: sr1_0; output cr2_1: sr2_0; output cr3_1: sr3_0; output cr4_1: sr4_0; output cr5_1: sr5_0;
+
+    connecting_rod_parameters master_rod_params(
+        mass: con_rod_mass * units.g,
+        moment_of_inertia: rod_moment_of_inertia(
+            mass: con_rod_mass * units.g,
+            length: con_rod * units.mm
+        ),
+        slave_throw: R1 * units.mm,
+        center_of_mass: 0.0,
+        length: con_rod * units.mm
+    )
+
+    connecting_rod_parameters slave_rod_params(
+        mass: slave_rod_mass * units.g,
+        moment_of_inertia: rod_moment_of_inertia(
+            mass: slave_rod_mass * units.g,
+            length: L1 * units.mm
+        ),
+        center_of_mass: 0.0,
+        length: L1 * units.mm
+    )
+
+    connecting_rod mcr0(master_rod_params)
+    connecting_rod mcr1(master_rod_params)
+    connecting_rod mcr2(master_rod_params)
+    connecting_rod mcr3(master_rod_params)
+    connecting_rod mcr4(master_rod_params)
+    connecting_rod mcr5(master_rod_params)
+
+    connecting_rod sr0_0(slave_rod_params)
+    connecting_rod sr1_0(slave_rod_params)
+    connecting_rod sr2_0(slave_rod_params)
+    connecting_rod sr3_0(slave_rod_params)
+    connecting_rod sr4_0(slave_rod_params)
+    connecting_rod sr5_0(slave_rod_params)
+
+    rod_journal sj0_0(angle: psi)
+    rod_journal sj1_0(angle: -psi)
+    rod_journal sj2_0(angle: psi)
+    rod_journal sj3_0(angle: -psi)
+    rod_journal sj4_0(angle: psi)
+    rod_journal sj5_0(angle: -psi)
+
+    mcr0.add_slave_journal(sj0_0)
+    mcr1.add_slave_journal(sj1_0)
+    mcr2.add_slave_journal(sj2_0)
+    mcr3.add_slave_journal(sj3_0)
+    mcr4.add_slave_journal(sj4_0)
+    mcr5.add_slave_journal(sj5_0)
 }
 
 public node eng {
@@ -621,12 +713,13 @@ public node eng {
     variant_0 variant()
 
     crank c0(vee / 2 + rot90, variant)
+    rods r(c0)
 
     ignition_module ignition(timing_curve: timing_curve, rev_limit: redline * 2.0 * units.rpm, limiter_duration: 0.05)
 
     bank_builder bank0(
         var: variant,
-        crankshaft: c0,
+        rods: r0(r),
         incline: vee / 2,
         phasing: 0,
         ignition: ignition,
@@ -637,7 +730,7 @@ public node eng {
 
     bank_builder bank1(
         var: variant,
-        crankshaft: c0,
+        rods: r1(r),
         incline: -vee / 2,
         phasing: vee + rot360,
         ignition: ignition,
@@ -693,8 +786,8 @@ public node eng {
         .add_sample(1733.3 * units.rpm, 20.0 * units.deg)
         .add_sample(1866.7 * units.rpm, 20.0 * units.deg)
         .add_sample(2000.0 * units.rpm, 20.0 * units.deg)
-        .add_sample(2133.3 * units.rpm, -15.0 * units.deg)
-        .add_sample(2266.7 * units.rpm, -45.0 * units.deg)
+        .add_sample(2133.3 * units.rpm, -12.5 * units.deg)
+        .add_sample(2266.7 * units.rpm, -25.0 * units.deg)
 
     engine
         .add_crankshaft(c0.c)

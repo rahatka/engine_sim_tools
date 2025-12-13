@@ -17,10 +17,14 @@ def calculate_displacement(input_str):
     stroke = parse_fraction(parts[1])
     cylinders = int(parts[2])
 
+    bore_mm = bore * 25.4
+    stroke_mm = stroke * 25.4
+    print(bore_mm, stroke_mm)
+
     displacement = (math.pi / 4) * bore**2 * stroke * cylinders
     return displacement
 
 # Example usage
-input_str = "3 3/4,6 1/8,4"
+input_str = "4 5/32,4 13/64,4"
 disp = calculate_displacement(input_str)
 print(f"{disp:.1f}")

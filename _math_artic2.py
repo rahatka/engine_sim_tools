@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import _math
 import _math_artic1
 from dataclasses import dataclass

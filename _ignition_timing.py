@@ -121,8 +121,8 @@ def ignition_timing(fpath):
     print("    timing_curve")
     for i, x in enumerate(interpolated_x):
         print(f"        .add_sample({x:.1f} * units.rpm, {interpolated_y[i]:.1f} * units.deg)")
-    print(f"        .add_sample({redline + step:.1f} * units.rpm, -15.0 * units.deg)")
-    print(f"        .add_sample({redline + step * 2:.1f} * units.rpm, -45.0 * units.deg)")
+    print(f"        .add_sample({redline + step:.1f} * units.rpm, -12.5 * units.deg)")
+    print(f"        .add_sample({redline + step * 2:.1f} * units.rpm, -25.0 * units.deg)")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog = 'calculate ignition')
