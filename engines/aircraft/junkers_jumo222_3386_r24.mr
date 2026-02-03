@@ -7,8 +7,88 @@
 // B2C4 B5C3, B1C4 B4C3, B3C2 B6C1
 // B2C2 B5C1, B1C3 B4C4, B3C4 B6C3
 
+// bank 2
+// stroke=144.456 mm Δstroke=4.456 mm
+// TDC at 61.032°, Δσ=1.032°, ΔTDC=-0.764 mm, CR=6.753
+// CR-optimal params: L1=203.989 or R1=75.989 or ψ=65.468°
+// bank 60.000°, avg-optimized ψ=66.25°, artic TDC=72.504°
+// ΔVolume=3.183%, ΔCR=0.038%
+
+// bank 3
+// stroke=145.005 mm Δstroke=5.005 mm
+// TDC at 123.186°, Δσ=3.186°, ΔTDC=-0.886 mm, CR=6.747
+// CR-optimal params: L1=204.015 or R1=76.015 or ψ=124.441°
+// bank 120.000°, avg-optimized ψ=126.25°, artic TDC=132.504°
+// ΔVolume=3.575%, ΔCR=-0.051%
+
+// bank 4
+// stroke=140.000 mm Δstroke=0.000 mm
+// TDC at 180.000°, Δσ=0.000°, ΔTDC=0.000 mm, CR=6.750
+// CR-optimal params: L1=204.000 or R1=76.000 or ψ=180.000°
+// bank 180.000°, avg-optimized ψ=180.00°, artic TDC=180.000°
+// ΔVolume=0.000%, ΔCR=0.000%
+
+// bank 5
+// stroke=145.005 mm Δstroke=5.005 mm
+// TDC at -123.186°, Δσ=-3.186°, ΔTDC=-0.886 mm, CR=6.747
+// CR-optimal params: L1=204.015 or R1=76.015 or ψ=-124.441°
+// bank -120.000°, avg-optimized ψ=-126.25°, artic TDC=-132.504°
+// ΔVolume=3.575%, ΔCR=-0.051%
+
+// bank 6
+// stroke=144.456 mm Δstroke=4.456 mm
+// TDC at -61.032°, Δσ=-1.032°, ΔTDC=-0.764 mm, CR=6.753
+// CR-optimal params: L1=203.989 or R1=75.989 or ψ=-65.468°
+// bank -60.000°, avg-optimized ψ=-66.25°, artic TDC=-72.504°
+// ΔVolume=3.183%, ΔCR=0.038%
+
+// CR-optimal R1 avg 76.002
+// CR-optimal L1 avg 204.002
+
+// actual displacement: 56.733 L 3462.09 CI avg CR: 6.750
+
 /*
 {
+  "artic_cfg": {
+    "chamber_volumes": [
+      402.056,
+      414.666,
+      416.678,
+      402.056,
+      416.678,
+      414.666
+    ],
+    "comp_R1": [
+      75.989,
+      76.015,
+      76.0,
+      76.015,
+      75.989
+    ],
+    "comp_ign": [
+      1.032,
+      3.186,
+      0.0,
+      -3.186,
+      -1.032
+    ],
+    "cyl_per_bank": 4,
+    "num_of_banks": 6,
+    "psi": [
+      65.5,
+      124.4,
+      180.0,
+      -124.4,
+      -65.5
+    ],
+    "sigma": [
+      60.0,
+      120.0,
+      180.0,
+      -120.0,
+      -60.0
+    ]
+  },
   "cam_cfg": {
     "equal_base_radius": true,
     "es_version": "0.1.14a",
@@ -69,7 +149,14 @@ constants constants()
 label bore(145.0) // 135 early
 label stroke(140.0)
 label compression_ratio(6.75)
-label con_rod(260.0) // ~
+label con_rod(280.0) // ~
+label L1(204.0) // ?
+label R1(76.0) // ~
+label psi0(-65.5 * units.deg)
+label psi1(-124.4 * units.deg)
+label psi2(180.0 * units.deg)
+label psi3(124.4 * units.deg)
+label psi4(65.5 * units.deg)
 label compression_height(50.0 * units.mm) // ?
 label intake_valve_diameter(55.3)
 label exhaust_valve_diameter(63.5)
@@ -105,6 +192,7 @@ label ILC((rot180 - IVO + IVC) / 2.0 + rot360)
 label ELC((rot180 - EVO + EVC) / 2.0 + rot180)
 
 label con_rod_mass(2500.0) // ? g
+label slave_rod_mass(850)
 label crank_mass(100.0) // ? kg
 label flywheel_mass(40.0) // kg
 
@@ -361,9 +449,10 @@ private node add_lobes {
 
 public node bank_builder {
     input var;
+    input chamber_volume;
     input incline;
     input phasing;
-    input crankshaft;
+    input rods;
     input ignition;
     input intake;
     input exhaust;
@@ -421,8 +510,8 @@ public node bank_builder {
 
     _b0.add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj0,
+            connecting_rod: rods.cr0,
+            rod_journal: rods.rj0,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl0,
@@ -430,8 +519,8 @@ public node bank_builder {
         )
     _b0.add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj1,
+            connecting_rod: rods.cr1,
+            rod_journal: rods.rj1,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl1,
@@ -439,8 +528,8 @@ public node bank_builder {
         )
     _b0.add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj2,
+            connecting_rod: rods.cr2,
+            rod_journal: rods.rj2,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl2,
@@ -448,8 +537,8 @@ public node bank_builder {
         )
     _b0.add_cylinder(
             piston: piston(piston_params),
-            connecting_rod: connecting_rod(cr_params),
-            rod_journal: crankshaft.rj3,
+            connecting_rod: rods.cr3,
+            rod_journal: rods.rj3,
             intake: intake,
             exhaust_system: exhaust,
             primary_length: pl3,
@@ -458,6 +547,7 @@ public node bank_builder {
 
     _b0.set_cylinder_head(
         head(
+            chamber_volume: chamber_volume,
             intake_camshaft: _intake_cam_0,
             exhaust_camshaft: _exhaust_cam_0,
             flip_display: flip
@@ -479,18 +569,19 @@ public node head {
     // intake port area: 37.4 cm²; saturated lift: 11.88 mm
     // exhaust port area: 24.6 cm²; saturated lift: 13.65 mm
     // cylinder volume: 2311.8 cm³ (141.08 CI); engine volume: 55.484 L (3385.82 CI)
-    // chamber volume: 402.1 cm³ (24.53 CI); conrod/stroke 1.857; N.A.C.C. 312.85
+    // chamber volume: 402.1 cm³ (24.53 CI); conrod/stroke 2.000; N.A.C.C. 312.85
     // 16 harmonic intake runner length: 27.5 cm; diameter: 6.5 cm
     // primary length: 35.5 cm, area: 27.1 cm², diameter: 5.9 cm
     // collector diameter: 28.8 cm, area: 650.8 cm²
 
+    input chamber_volume;
     input intake_camshaft;
     input exhaust_camshaft;
     input flip_display: false;
     
     alias output __out: head;
     generic_cylinder_head head(
-        chamber_volume: 402.056 * units.cc,
+        chamber_volume: chamber_volume * units.cc,
         intake_runner_volume: 920.7 * units.cc,
         intake_runner_cross_section_area: 33.5 * units.cm2,
         exhaust_runner_volume: 306.9 * units.cc,
@@ -541,6 +632,201 @@ public node crank {
         .add_rod_journal(_rj3)
 }
 
+public node r0 {
+    input rods;
+    output cr0: rods.cr0_0;
+    output cr1: rods.cr1_0;
+    output cr2: rods.cr2_0;
+    output cr3: rods.cr3_0;
+    output rj0: rods.rj0_0;
+    output rj1: rods.rj1_0;
+    output rj2: rods.rj2_0;
+    output rj3: rods.rj3_0;
+}
+
+public node r1 {
+    input rods;
+    output cr0: rods.cr0_1;
+    output cr1: rods.cr1_1;
+    output cr2: rods.cr2_1;
+    output cr3: rods.cr3_1;
+    output rj0: rods.rj0_1;
+    output rj1: rods.rj1_1;
+    output rj2: rods.rj2_1;
+    output rj3: rods.rj3_1;
+}
+
+public node r2 {
+    input rods;
+    output cr0: rods.cr0_2;
+    output cr1: rods.cr1_2;
+    output cr2: rods.cr2_2;
+    output cr3: rods.cr3_2;
+    output rj0: rods.rj0_2;
+    output rj1: rods.rj1_2;
+    output rj2: rods.rj2_2;
+    output rj3: rods.rj3_2;
+}
+
+public node r3 {
+    input rods;
+    output cr0: rods.cr0_3;
+    output cr1: rods.cr1_3;
+    output cr2: rods.cr2_3;
+    output cr3: rods.cr3_3;
+    output rj0: rods.rj0_3;
+    output rj1: rods.rj1_3;
+    output rj2: rods.rj2_3;
+    output rj3: rods.rj3_3;
+}
+
+public node r4 {
+    input rods;
+    output cr0: rods.cr0_4;
+    output cr1: rods.cr1_4;
+    output cr2: rods.cr2_4;
+    output cr3: rods.cr3_4;
+    output rj0: rods.rj0_4;
+    output rj1: rods.rj1_4;
+    output rj2: rods.rj2_4;
+    output rj3: rods.rj3_4;
+}
+
+public node r5 {
+    input rods;
+    output cr0: rods.cr0_5;
+    output cr1: rods.cr1_5;
+    output cr2: rods.cr2_5;
+    output cr3: rods.cr3_5;
+    output rj0: rods.rj0_5;
+    output rj1: rods.rj1_5;
+    output rj2: rods.rj2_5;
+    output rj3: rods.rj3_5;
+}
+
+public node rods {
+    input rj0; input rj1; input rj2; input rj3;
+
+    output cr0_0: mcr0; output cr1_0: mcr1; output cr2_0: mcr2; output cr3_0: mcr3;
+    output rj0_0: rj0; output rj1_0: rj1; output rj2_0: rj2; output rj3_0: rj3;
+
+    output cr0_1: sr0_0; output cr1_1: sr1_0; output cr2_1: sr2_0; output cr3_1: sr3_0;
+    output rj0_1: sj0_0; output rj1_1: sj1_0; output rj2_1: sj2_0; output rj3_1: sj3_0;
+
+    output cr0_2: sr0_1; output cr1_2: sr1_1; output cr2_2: sr2_1; output cr3_2: sr3_1;
+    output rj0_2: sj0_1; output rj1_2: sj1_1; output rj2_2: sj2_1; output rj3_2: sj3_1;
+
+    output cr0_3: sr0_2; output cr1_3: sr1_2; output cr2_3: sr2_2; output cr3_3: sr3_2;
+    output rj0_3: sj0_2; output rj1_3: sj1_2; output rj2_3: sj2_2; output rj3_3: sj3_2;
+
+    output cr0_4: sr0_3; output cr1_4: sr1_3; output cr2_4: sr2_3; output cr3_4: sr3_3;
+    output rj0_4: sj0_3; output rj1_4: sj1_3; output rj2_4: sj2_3; output rj3_4: sj3_3;
+
+    output cr0_5: sr0_4; output cr1_5: sr1_4; output cr2_5: sr2_4; output cr3_5: sr3_4;
+    output rj0_5: sj0_4; output rj1_5: sj1_4; output rj2_5: sj2_4; output rj3_5: sj3_4;
+
+    connecting_rod_parameters master_rod_params(
+        mass: con_rod_mass * units.g,
+        moment_of_inertia: rod_moment_of_inertia(
+            mass: con_rod_mass * units.g,
+            length: con_rod * units.mm
+        ),
+        slave_throw: R1 * units.mm,
+        center_of_mass: 0.0,
+        length: con_rod * units.mm
+    )
+
+    connecting_rod_parameters slave_rod_params(
+        mass: slave_rod_mass * units.g,
+        moment_of_inertia: rod_moment_of_inertia(
+            mass: slave_rod_mass * units.g,
+            length: L1 * units.mm
+        ),
+        center_of_mass: 0.0,
+        length: L1 * units.mm
+    )
+
+    connecting_rod mcr0(master_rod_params)
+    connecting_rod mcr1(master_rod_params)
+    connecting_rod mcr2(master_rod_params)
+    connecting_rod mcr3(master_rod_params)
+
+    connecting_rod sr0_0(slave_rod_params)
+    connecting_rod sr1_0(slave_rod_params)
+    connecting_rod sr2_0(slave_rod_params)
+    connecting_rod sr3_0(slave_rod_params)
+
+    connecting_rod sr0_1(slave_rod_params)
+    connecting_rod sr1_1(slave_rod_params)
+    connecting_rod sr2_1(slave_rod_params)
+    connecting_rod sr3_1(slave_rod_params)
+
+    connecting_rod sr0_2(slave_rod_params)
+    connecting_rod sr1_2(slave_rod_params)
+    connecting_rod sr2_2(slave_rod_params)
+    connecting_rod sr3_2(slave_rod_params)
+
+    connecting_rod sr0_3(slave_rod_params)
+    connecting_rod sr1_3(slave_rod_params)
+    connecting_rod sr2_3(slave_rod_params)
+    connecting_rod sr3_3(slave_rod_params)
+
+    connecting_rod sr0_4(slave_rod_params)
+    connecting_rod sr1_4(slave_rod_params)
+    connecting_rod sr2_4(slave_rod_params)
+    connecting_rod sr3_4(slave_rod_params)
+
+    rod_journal sj0_0(angle: psi0)
+    rod_journal sj1_0(angle: psi0)
+    rod_journal sj2_0(angle: psi0)
+    rod_journal sj3_0(angle: psi0)
+
+    rod_journal sj0_1(angle: psi1)
+    rod_journal sj1_1(angle: psi1)
+    rod_journal sj2_1(angle: psi1)
+    rod_journal sj3_1(angle: psi1)
+
+    rod_journal sj0_2(angle: psi2)
+    rod_journal sj1_2(angle: psi2)
+    rod_journal sj2_2(angle: psi2)
+    rod_journal sj3_2(angle: psi2)
+
+    rod_journal sj0_3(angle: psi3)
+    rod_journal sj1_3(angle: psi3)
+    rod_journal sj2_3(angle: psi3)
+    rod_journal sj3_3(angle: psi3)
+
+    rod_journal sj0_4(angle: psi4)
+    rod_journal sj1_4(angle: psi4)
+    rod_journal sj2_4(angle: psi4)
+    rod_journal sj3_4(angle: psi4)
+
+    mcr0.add_slave_journal(sj0_0)
+    mcr1.add_slave_journal(sj1_0)
+    mcr2.add_slave_journal(sj2_0)
+    mcr3.add_slave_journal(sj3_0)
+
+    mcr0.add_slave_journal(sj0_1)
+    mcr1.add_slave_journal(sj1_1)
+    mcr2.add_slave_journal(sj2_1)
+    mcr3.add_slave_journal(sj3_1)
+
+    mcr0.add_slave_journal(sj0_2)
+    mcr1.add_slave_journal(sj1_2)
+    mcr2.add_slave_journal(sj2_2)
+    mcr3.add_slave_journal(sj3_2)
+
+    mcr0.add_slave_journal(sj0_3)
+    mcr1.add_slave_journal(sj1_3)
+    mcr2.add_slave_journal(sj2_3)
+    mcr3.add_slave_journal(sj3_3)
+
+    mcr0.add_slave_journal(sj0_4)
+    mcr1.add_slave_journal(sj1_4)
+    mcr2.add_slave_journal(sj2_4)
+    mcr3.add_slave_journal(sj3_4)
+}
+
 public node eng {
     alias output __out: engine;
 
@@ -566,11 +852,14 @@ public node eng {
     crank c0(v1342, rot90 + vee / 2)
     ignition_module ignition(timing_curve: timing_curve, rev_limit: redline * 1.5 * units.rpm, limiter_duration: 0.03)
 
+    rods r(c0.rj0, c0.rj1, c0.rj2, c0.rj3)
+
     bank_builder bank1(
         var: v1243,
+        chamber_volume: 402.056,
         incline: vee / 2.0,
         phasing: 0,
-        crankshaft: c0,
+        rods: r0(r),
         ignition: ignition,
         intake: intake,
         exhaust: exhaust0,
@@ -579,9 +868,10 @@ public node eng {
 
     bank_builder bank2(
         var: v1342,
+        chamber_volume: 414.666,
         incline: -vee / 2.0,
         phasing: vee + rot360,
-        crankshaft: c0,
+        rods: r1(r),
         ignition: ignition,
         intake: intake,
         exhaust: exhaust1
@@ -589,9 +879,10 @@ public node eng {
 
     bank_builder bank3(
         var: v1243,
+        chamber_volume: 416.678,
         incline: -vee / 2.0 - vee,
         phasing: vee * 2.0 + rot360,
-        crankshaft: c0,
+        rods: r2(r),
         ignition: ignition,
         intake: intake,
         exhaust: exhaust1,
@@ -600,9 +891,10 @@ public node eng {
 
     bank_builder bank4(
         var: v1342,
+        chamber_volume: 402.056,
         incline: -vee / 2.0 - vee * 2.0,
         phasing: vee * 3.0,
-        crankshaft: c0,
+        rods: r3(r),
         ignition: ignition,
         intake: intake,
         exhaust: exhaust2
@@ -610,9 +902,10 @@ public node eng {
 
     bank_builder bank5(
         var: v1243,
+        chamber_volume: 416.678,
         incline: -vee / 2.0 - vee * 3.0,
         phasing: vee * 4.0,
-        crankshaft: c0,
+        rods: r4(r),
         ignition: ignition,
         intake: intake,
         exhaust: exhaust2,
@@ -621,9 +914,10 @@ public node eng {
 
     bank_builder bank6(
         var: v1342,
+        chamber_volume: 414.666,
         incline: -vee / 2.0 - vee * 4.0,
         phasing: vee * 5.0 + rot360,
-        crankshaft: c0,
+        rods: r5(r),
         ignition: ignition,
         intake: intake,
         exhaust: exhaust0
@@ -633,7 +927,7 @@ public node eng {
     label collector_cross_section_area(216.9)
 
     label exhaust_pipe_length_0(100.0) // cm
-    label exhaust_volume_0(collector_cross_section_area * exhaust_pipe_length_0 / 100.0) // Litres
+    label exhaust_volume_0(collector_cross_section_area * exhaust_pipe_length_0 / 1000.0) // Litres
 
     intake intake(
         plenum_volume: 25.0 * units.L,

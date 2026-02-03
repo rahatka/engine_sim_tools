@@ -2,53 +2,69 @@
 // 1932 Pratt & Whitney R-2060 Yellow Jacket 1500 @ 3300
 // Created by oror 2025
 
-// calculating bank 2
-// stroke 123.967 mm Δstroke 0.142 mm
-// max S 321.535 mm at 74.2° Δσ 2.2° ΔS -0.728 mm
-// CR 5.863 opt L1 201.511 opt R1 61.528 opt ψ 73.714°
-// bank 72.000° avg-optimized ψ 78.54° artic TDC 85.071°
+// bank 2
+// stroke=126.448 mm Δstroke=2.623 mm
+// TDC at 73.540°, Δσ=1.540°, ΔTDC=-0.525 mm, CR=6.000
+// CR-optimal params: L1=200.000 or R1=60.800 or ψ=75.946°
+// bank 72.000°, avg-optimized ψ=78.54°, artic TDC=85.071°
+// ΔVolume=2.119%, ΔCR=0.000%
 
-// calculating bank 3
-// stroke 124.277 mm Δstroke 0.452 mm
-// max S 322.874 mm at 147.0° Δσ 3.0° ΔS 0.612 mm
-// CR 6.145 opt L1 200.110 opt R1 60.092 opt ψ 141.401°
-// bank 144.000° avg-optimized ψ 148.02° artic TDC 152.035°
+// bank 3
+// stroke=124.476 mm Δstroke=0.651 mm
+// TDC at 146.866°, Δσ=2.866°, ΔTDC=-0.130 mm, CR=6.000
+// CR-optimal params: L1=200.000 or R1=60.800 or ψ=144.450°
+// bank 144.000°, avg-optimized ψ=148.02°, artic TDC=152.035°
+// ΔVolume=0.526%, ΔCR=0.000%
 
-// calculating bank 4
-// stroke 124.277 mm Δstroke 0.452 mm
-// max S 322.874 mm at -147.0° Δσ -3.0° ΔS 0.612 mm
-// CR 6.145 opt L1 200.110 opt R1 60.092 opt ψ 218.599°
-// bank 216.000° avg-optimized ψ 211.98° artic TDC 207.965°
+// bank 4
+// stroke=124.476 mm Δstroke=0.651 mm
+// TDC at 213.134°, Δσ=-2.866°, ΔTDC=-0.130 mm, CR=6.000
+// CR-optimal params: L1=200.000 or R1=60.800 or ψ=215.550°
+// bank 216.000°, avg-optimized ψ=211.98°, artic TDC=207.965°
+// ΔVolume=0.526%, ΔCR=0.000%
 
-// calculating bank 5
-// stroke 123.967 mm Δstroke 0.142 mm
-// max S 321.535 mm at -74.2° Δσ -2.2° ΔS -0.728 mm
-// CR 5.863 opt L1 201.511 opt R1 61.528 opt ψ 286.286°
-// bank 288.000° avg-optimized ψ 281.46° artic TDC 274.929°
+// bank 5
+// stroke=126.448 mm Δstroke=2.623 mm
+// TDC at 286.460°, Δσ=-1.540°, ΔTDC=-0.525 mm, CR=6.000
+// CR-optimal params: L1=200.000 or R1=60.800 or ψ=284.054°
+// bank 288.000°, avg-optimized ψ=281.46°, artic TDC=274.929°
+// ΔVolume=2.119%, ΔCR=0.000%
 
-// CR-optimal R1 avg 60.810
-// CR-optimal L1 avg 200.810
+// CR-optimal R1 avg 60.800
+// CR-optimal L1 avg 200.000
 
-// actual displacement: 33.833 L 2064.63 CI avg CR: 6.003
+// actual displacement: 34.126 L 2082.48 CI avg CR: 6.000
 
 /*
 {
   "artic_cfg": {
+    "chamber_volumes": [
+      337.685,
+      344.839,
+      339.458,
+      339.458,
+      344.839
+    ],
     "comp_R1": [
-      61.528,
-      60.092,
-      60.092,
-      61.528
+      60.8,
+      60.8,
+      60.8,
+      60.8
     ],
     "comp_ign": [
-      2.2,
-      3.0,
-      -3.0,
-      -2.2
+      1.54,
+      2.866,
+      -2.866,
+      -1.54
     ],
     "cyl_per_bank": 4,
     "num_of_banks": 5,
-    "psi": null,
+    "psi": [
+      75.946,
+      144.45,
+      215.55,
+      284.054
+    ],
     "sigma": null
   },
   "cam_cfg": {
@@ -113,8 +129,12 @@ label bore(131.7625) // 5 3/16
 label stroke(123.825) // 4 7/8
 label compression_ratio(6.0)
 label con_rod(260.35) // 10 1/4
-label L1(200.8124) // 7.906
+label L1(200.0) // 7.906
 label R1(60.8) // ?
+label psi0(75.946 * units.deg)
+label psi1(144.45 * units.deg)
+label psi2(215.55 * units.deg)
+label psi3(284.054 * units.deg)
 label compression_height(47.4 * units.mm) // ?
 label intake_valve_diameter(56.2102) // 2.213 ?
 label exhaust_valve_diameter(56.2102) // 2.213 ?
@@ -390,6 +410,7 @@ private node add_lobes {
 
 public node bank_builder {
     input shift;
+    input chamber_volume;
     input ignition;
     input intake;
     input exhaust;
@@ -479,6 +500,7 @@ public node bank_builder {
 
     _b0.set_cylinder_head(
         head(
+            chamber_volume: chamber_volume,
             intake_camshaft: _intake_cam_0,
             exhaust_camshaft: _exhaust_cam_0
         )
@@ -510,13 +532,14 @@ public node head {
     // primary length: 35.1 cm, area: 19.5 cm², diameter: 5.0 cm
     // collector diameter: 18.7 cm, area: 273.3 cm²
 
+    input chamber_volume;
     input intake_camshaft;
     input exhaust_camshaft;
     input flip_display: false;
     
     alias output __out: head;
     generic_cylinder_head head(
-        chamber_volume: 337.685 * units.cc,
+        chamber_volume: chamber_volume * units.cc,
         intake_runner_volume: 655.6 * units.cc,
         intake_runner_cross_section_area: 25.9 * units.cm2,
         exhaust_runner_volume: 226.1 * units.cc,
@@ -656,11 +679,6 @@ public node rods {
     connecting_rod sr2_3(slave_rod_params)
     connecting_rod sr3_3(slave_rod_params)
 
-    label psi0(rot * 2)
-    label psi1(rot * 4)
-    label psi2(rot * 6)
-    label psi3(rot * 8)
-
     rod_journal sj0_0(angle: psi0)
     rod_journal sj1_0(angle: psi0)
     rod_journal sj2_0(angle: psi0)
@@ -749,6 +767,7 @@ public node eng {
 
     bank_builder bank0(
         shift: 0,
+        chamber_volume: 337.685,
         ignition: ignition,
         intake: intake,
         exhaust: exhaust,
@@ -758,6 +777,7 @@ public node eng {
     )
     bank_builder bank1(
         shift: vee * 1 + rot360,
+        chamber_volume: 344.839,
         ignition: ignition,
         intake: intake,
         exhaust: exhaust,
@@ -767,6 +787,7 @@ public node eng {
     )
     bank_builder bank2(
         shift: vee * 2,
+        chamber_volume: 339.458,
         ignition: ignition,
         intake: intake,
         exhaust: exhaust,
@@ -776,6 +797,7 @@ public node eng {
     )
     bank_builder bank3(
         shift: vee * 3 + rot360,
+        chamber_volume: 339.458,
         ignition: ignition,
         intake: intake,
         exhaust: exhaust,
@@ -785,6 +807,7 @@ public node eng {
     )
     bank_builder bank4(
         shift: vee * 4,
+        chamber_volume: 344.839,
         ignition: ignition,
         intake: intake,
         exhaust: exhaust,
@@ -798,7 +821,7 @@ public node eng {
     label collector_cross_section_area(273.3)
 
     label exhaust_pipe_length_0(200.0) // cm
-    label exhaust_volume_0(collector_cross_section_area * exhaust_pipe_length_0 / 100.0) // Litres
+    label exhaust_volume_0(collector_cross_section_area * exhaust_pipe_length_0 / 1000.0) // Litres
     
     label spacing_factor(1.2)
     label flange_density(1.0 * exhaust_delay_coeff)
@@ -890,10 +913,10 @@ public node veh {
 private node trn {
     alias output __out:
         transmission(
-            max_clutch_torque: 2500 * units.Nm,
-            max_clutch_flex: 15 * units.deg,
+            max_clutch_torque: 4000 * units.Nm,
+            max_clutch_flex: 12 * units.deg,
             limit_clutch_flex: true,
-            clutch_stiffness: 50 * units.Nm / units.deg,
+            clutch_stiffness: 200 * units.Nm / units.deg,
             clutch_damping: 1.0,
             simulate_flex: true
         )

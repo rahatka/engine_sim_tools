@@ -11,38 +11,46 @@ import _math_artic2
 from comment_parser import comment_parser
 from tkinter.filedialog import askopenfilename
 
-theta_values = np.linspace(0, 360, 3601)
+cc_to_ci = np.float64(0.0610237441)
+angular_delta_window = 30
+metric_delta_window = 10
 json_pattern = regex.compile(r'\{(?:[^{}]|(?R))*\}')
 
 
+class Calc:
+    def __init__(self):
+        self.redline = None  # Engine redline (RPM)
+        self.bore = None  # Engine bore (mm)
+        self.stroke = None  # Engine stroke (mm)
+        self.cr = None  # Compression ratio in the master cylinder
+        self.R = None  # Crank throw (mm)
+        self.R1 = None  # Artic arm length (distance from artic pin to crank throw) (mm)
+        self.L = None  # Master rod length (mm)
+        self.L1 = None  # Artic rod length (mm)
+        self.psi_deg = None  # Artic pin angle relative to the master rod axis (deg)
+        self.sigma_deg = None  # Artic cylinder angle relative to the master cylinder axis (deg)
+        self.chamber_vol = None  # Combustion chamber volume (mm^3)
+        self.crs = []  # Compression ratios
+        self.cyl_per_bank = None  # Number of cylinders per bank
+        self.displacement = 0  # Total engine displacement (mm^3)
+        self.comp_L1 = []  # Compensated (optimally calculated) articulating rod lengths (mm)
+        self.comp_R1 = []  # Compensated (optimally calculated) articulating arm lengths (mm)
+        self.comp_ign = []  # Compensated (optimally calculated) ignition events (deg)
+        self.chamber_volumes = []  # Chamber volumes for all banks (the master bank is always first) (mm^3)
+
+
+# neg_mod(x, mod): modulo that preserves negative remainders.
 def neg_mod(x, mod):
     r = x % mod
     return r if x >= 0 or r == 0 else r - mod
 
 
-class Calc:
-    def __init__(self):
-        self.redline = None
-        self.bore = None
-        self.stroke = None
-        self.cr = None
-        self.R = None
-        self.R1 = None
-        self.L = None
-        self.L1 = None
-        self.psi_deg = None
-        self.sigma_deg = None
-        self.chamber_vol = None
-        self.crs = []
-        self.cyl_per_bank = None
-        self.displacement = 0
-        self.comp_L1 = []
-        self.comp_R1 = []
-        self.comp_ign = []
-
+# cyl_vol(bore, stroke): cylinder swept volume from bore and stroke.
 def cyl_vol(bore, stroke):
     return (np.pi / 4) * bore**2 * stroke
 
+
+# round_floats(o): recursively round all float values to 3 decimals.
 def round_floats(o):
     if isinstance(o, float):
         return round(o, 3)
@@ -51,6 +59,13 @@ def round_floats(o):
     if isinstance(o, (list, tuple)):
         return [round_floats(x) for x in o]
     return o
+
+
+def pct_diff(base, value):
+    if base == 0:
+        raise ValueError("base must be non-zero")
+    return (value - base) / base * 100.0
+
 
 def parse_cfg(fpath):
     cfg = {
@@ -90,125 +105,140 @@ def parse_cfg(fpath):
 
     return raw, cfg, other_config
 
-cc_to_ci = np.float64(0.0610237441)
 
+# calculate_S(c, theta_deg, L1, R1, psi, sigma): piston position/displacement S for an articulated-rod cylinder.
+# theta_deg is the crank angle in degrees; psi and sigma are angular offsets (radians, as used in trig calls).
+# Uses the master-rod angle alpha and the articulating-rod angle beta to compute S along the cylinder axis.
 def calculate_S(c, theta_deg, L1, R1, psi, sigma):
     theta = np.radians(theta_deg)
-    
     alpha = np.arcsin((c.R * np.sin(theta)) / c.L)
     beta = np.arcsin((c.R * np.sin(sigma - theta) + R1 * np.sin(sigma - psi + alpha)) / L1)
-    
     return c.R * np.cos(sigma - theta) + R1 * np.cos(sigma - psi + alpha) + L1 * np.cos(beta)
 
-def find_optimal_L1_for_S(c, psi, sigma):
-    def error_function(L1_guess):
-        max_S = max([calculate_S(c, theta, L1_guess, c.R1, psi, sigma) for theta in theta_values])
-        return abs(max_S - (c.L + c.R))
-    
-    optimal_L1 = opt.minimize_scalar(error_function, bounds=(c.L1-50, c.L1+50), method='bounded')
-    return optimal_L1.x
 
-def find_optimal_R1_for_S(c, psi, sigma):
+def find_S_extrema(c, L1, R1, psi, sigma):
+
+    xatol = 1.0 / 3600.0  # 1 arcsec tolerance
+
+    max_window_deg=(np.degrees(sigma) - angular_delta_window, np.degrees(sigma) + angular_delta_window)
+    min_window_deg=(np.degrees(sigma) - angular_delta_window + 180, np.degrees(sigma) + angular_delta_window + 180)
+
+    def S(theta_deg: float) -> float:
+        v = calculate_S(c, theta_deg, L1, R1, psi, sigma)
+        # If geometry goes invalid (arcsin domain -> nan), penalize it
+        return float(v) if np.isfinite(v) else np.inf
+
+    def negS(theta_deg: float) -> float:
+        v = S(theta_deg)
+        return np.inf if not np.isfinite(v) else -v
+
+    res_max = opt.minimize_scalar(
+        negS,
+        bounds=max_window_deg,
+        method="bounded",
+        options={"xatol": xatol}
+    )
+    theta_max = float(res_max.x)
+    S_max = float(-res_max.fun)
+
+    res_min = opt.minimize_scalar(
+        S,
+        bounds=min_window_deg,
+        method="bounded",
+        options={"xatol": xatol}
+    )
+    theta_min = float(res_min.x)
+    S_min = float(res_min.fun)
+
+    return {
+        "theta_max_deg": theta_max,
+        "S_max": S_max,
+        "theta_min_deg": theta_min,
+        "S_min": S_min,
+        "delta_S": S_max - S_min,
+    }
+
+
+# optimize_R1_for_CR(c, target_CR, psi, sigma): find the artic arm length R1 that matches a target compression ratio.
+def optimize_R1_for_CR(c, target_CR, psi, sigma):
     def error_function(R1_guess):
-        max_S = max([calculate_S(c, theta, c.L1, R1_guess, psi, sigma) for theta in theta_values])
-        return abs(max_S - (c.L + c.R))
-    
-    optimal_R1 = opt.minimize_scalar(error_function, bounds=(c.R1-50, c.R1+50), method='bounded')
-    return optimal_R1.x
-
-def find_optimal_psi_for_S(c, theta_deg, sigma, artic_tdc):
-    def error_function(psi_guess):
-        S = calculate_S(c, theta_deg, c.L1, c.R1, np.radians(psi_guess), sigma)
-        return abs(S - (c.L + c.R))
-
-    bound_min = min(np.degrees(sigma), artic_tdc)
-    bound_max = max(np.degrees(sigma), artic_tdc)
-    optimal_psi = opt.minimize_scalar(error_function, bounds=(bound_min, bound_max), method='bounded')
-
-    return optimal_psi.x
-
-def find_optimal_R1_for_CR(c, target_CR, psi, sigma):
-    def error_function(R1_guess):
-        S_values = [calculate_S(c, theta, c.L1, R1_guess, psi, sigma) for theta in theta_values]
-        max_S = max(S_values)
-        y = max_S - min(S_values)
-        delta_S = max_S - c.L - c.R
-        cyl_displacement = cyl_vol(c.bore, y)
-        delta_S_displacement = cyl_vol(c.bore, delta_S)
-        calculated_CR = cyl_displacement / (c.chamber_vol - delta_S_displacement) + 1
+        extrema = find_S_extrema(c, c.L1, R1_guess, psi, sigma)
+        delta_S_max = extrema["S_max"] - c.L - c.R
+        cyl_displacement = cyl_vol(c.bore, extrema["delta_S"])
+        delta_S_max_displacement = cyl_vol(c.bore, delta_S_max)
+        calculated_CR = cyl_displacement / (c.chamber_vol - delta_S_max_displacement) + 1
         return abs(calculated_CR - target_CR)
 
-    result = opt.minimize_scalar(error_function, bounds=(c.R1 - 10, c.R1 + 10), method='bounded')
+    result = opt.minimize_scalar(error_function, bounds=(c.R1 - metric_delta_window, c.R1 + metric_delta_window), method='bounded')
     return result.x
 
-def find_optimal_L1_for_CR(c, target_CR, psi, sigma):
+
+# optimize_L1_for_CR(c, target_CR, psi, sigma): find the artic rod length L1 that matches a target compression ratio.
+def optimize_L1_for_CR(c, target_CR, psi, sigma):
     def error_function(L1_guess):
-        S_values = [calculate_S(c, theta, L1_guess, c.R1, psi, sigma) for theta in theta_values]
-        max_S = max(S_values)
-        y = max_S - min(S_values)
-        delta_S = max_S - c.L - c.R
-        cyl_displacement = cyl_vol(c.bore, y)
-        delta_S_displacement = cyl_vol(c.bore, delta_S)
-        calculated_CR = cyl_displacement / (c.chamber_vol - delta_S_displacement) + 1
+        extrema = find_S_extrema(c, L1_guess, c.R1, psi, sigma)
+        delta_S_max = extrema["S_max"] - c.L - c.R
+        cyl_displacement = cyl_vol(c.bore, extrema["delta_S"])
+        delta_S_max_displacement = cyl_vol(c.bore, delta_S_max)
+        calculated_CR = cyl_displacement / (c.chamber_vol - delta_S_max_displacement) + 1
         return abs(calculated_CR - target_CR)
 
-    result = opt.minimize_scalar(error_function, bounds=(c.L1 - 10, c.L1 + 10), method='bounded')
+    result = opt.minimize_scalar(error_function, bounds=(c.L1 - metric_delta_window, c.L1 + metric_delta_window), method='bounded')
     return result.x
 
-def find_optimal_psi_for_CR(c, target_CR, psi, sigma):
+
+# optimize_psi_for_CR(c, target_CR, psi, sigma): find the artic pin angle psi that matches a target compression ratio.
+def optimize_psi_for_CR(c, target_CR, sigma, artic_tdc):
     def error_function(psi_guess):
-        S_values = [calculate_S(c, theta, c.L1, c.R1, psi_guess, sigma) for theta in theta_values]
-        max_S = max(S_values)
-        y = max_S - min(S_values)
-        delta_S = max_S - c.L - c.R
-        cyl_displacement = cyl_vol(c.bore, y)
-        delta_S_displacement = cyl_vol(c.bore, delta_S)
-        calculated_CR = cyl_displacement / (c.chamber_vol - delta_S_displacement) + 1
+        extrema = find_S_extrema(c, c.L1, c.R1, psi_guess, sigma)
+        delta_S_max = extrema["S_max"] - c.L - c.R
+        cyl_displacement = cyl_vol(c.bore, extrema["delta_S"])
+        delta_S_max_displacement = cyl_vol(c.bore, delta_S_max)
+        calculated_CR = cyl_displacement / (c.chamber_vol - delta_S_max_displacement) + 1
         return abs(calculated_CR - target_CR)
 
-    result = opt.minimize_scalar(error_function, bounds=(psi - 0.5, psi + 0.5), method='bounded')
+    a_min = min(sigma, np.radians(artic_tdc))
+    a_max = max(sigma, np.radians(artic_tdc))
+    result = opt.minimize_scalar(error_function, bounds=(a_min, a_max), method='bounded')
     return result.x
+
 
 def calculate(c, psi, sigma):
-    S_values = [calculate_S(c, theta, c.L1, c.R1, psi, sigma) for theta in theta_values]
+    extrema = find_S_extrema(c, c.L1, c.R1, psi, sigma)
 
-    max_S = max(S_values)
-    max_index = S_values.index(max_S)
-    theta_at_max_S = theta_values[max_index]
+    artic_stroke = extrema["delta_S"]
+    theta_at_max_S = extrema["theta_max_deg"]
 
-    y = max_S - min(S_values)
-    delta_S = max_S - c.L - c.R
-    cyl_displacement = cyl_vol(c.bore, y)
+    delta_S = extrema["S_max"] - c.L - c.R
+    cyl_displacement = cyl_vol(c.bore, artic_stroke)
     delta_S_displacement = cyl_vol(c.bore, delta_S)
     artic_chamber_vol = c.chamber_vol - delta_S_displacement
 
     calc_cr = (cyl_displacement / (artic_chamber_vol) + 1)
 
-    if theta_at_max_S > 180:
-        theta_at_max_S -= 360
+    # if theta_at_max_S > 180:
+    #     theta_at_max_S -= 360
     delta_sigma = theta_at_max_S - np.degrees(sigma)
     delta_sigma = neg_mod(delta_sigma, 360)
     
     c.displacement += cyl_displacement * c.cyl_per_bank
     artic_tdc = 90 + np.degrees(sigma) - np.degrees(np.arccos(c.R * np.sin(sigma) / c.L))
-    # optimal_L1 = find_optimal_L1_for_S(c, psi, sigma)
-    optimal_R1 = find_optimal_R1_for_CR(c, c.cr, psi, sigma)
-    optimal_L1 = find_optimal_L1_for_CR(c, c.cr, psi, sigma)
-    optimal_psi = find_optimal_psi_for_CR(c, c.cr, psi, sigma)
-    # optimal_psi = find_optimal_psi_for_S(c, theta_at_max_S, sigma, artic_tdc)
+    optimal_R1 = optimize_R1_for_CR(c, c.cr, psi, sigma)
+    optimal_L1 = optimize_L1_for_CR(c, c.cr, psi, sigma)
+    optimal_psi = optimize_psi_for_CR(c, c.cr, sigma, artic_tdc)
 
     c.comp_L1.append(optimal_L1)
     c.comp_R1.append(optimal_R1)
     c.crs.append(calc_cr)
     c.comp_ign.append(delta_sigma)
+    c.chamber_volumes.append(artic_chamber_vol / 1000)
 
-    print(f"// stroke={y:.3f} mm Δstroke={y - c.stroke:.3f} mm")
-    print(f"// max S={max_S:.3f} mm at {theta_at_max_S:.1f}°, Δσ={delta_sigma:.1f}°, ΔS={delta_S:.3f} mm, CR={calc_cr:.3f}")
+    print(f"// stroke={artic_stroke:.3f} mm Δstroke={artic_stroke - c.stroke:.3f} mm")
+    print(f"// TDC at {theta_at_max_S:.3f}°, Δσ={delta_sigma:.3f}°, ΔTDC={delta_S:.3f} mm, CR={calc_cr:.3f}")
     print(f"// CR-optimal params: L1={optimal_L1:.3f} or R1={optimal_R1:.3f} or ψ={np.degrees(optimal_psi):.3f}°")
     print(f"// bank {np.degrees(sigma):.3f}°, avg-optimized ψ={(np.degrees(sigma) + artic_tdc) / 2:.2f}°, artic TDC={artic_tdc:.3f}°")
-    # print(f"optimal L1 when R1 is {R1} mm: {optimal_L1:.3f} mm")
-    # print(f"optimal R1 when L1 is {L1} mm: {optimal_R1:.3f} mm")
-    # print(f"optimal ψ for max_S: {optimal_psi:.1f}°\n")
+    print(f"// ΔVolume={pct_diff(c.stroke, artic_stroke):.3f}%, ΔCR={pct_diff(c.cr, calc_cr):.3f}%")
+
 
 def artic(fpath, graphs, common_r1):
     if fpath is None:
@@ -270,8 +300,9 @@ def artic(fpath, graphs, common_r1):
 
         c.displacement = cyl_vol(c.bore, c.stroke) * c.cyl_per_bank
         c.crs.append(c.cr)
+        c.chamber_volumes.append(c.chamber_vol / 1000)
         for i in range(cfg["num_of_banks"] - 1):
-            print(f"\n// calculating bank {i + 2}")
+            print(f"\n// bank {i + 2}")
             calculate(c, np.radians(c.psi_deg[i]), np.radians(c.sigma_deg[i]))
         td = c.displacement / 1_000_000
         td_ci = c.displacement / 1000 * cc_to_ci
@@ -281,6 +312,7 @@ def artic(fpath, graphs, common_r1):
 
         cfg["comp_R1"] = c.comp_R1
         cfg["comp_ign"] = c.comp_ign
+        cfg["chamber_volumes"] = c.chamber_volumes
 
         combined_config = {"artic_cfg": round_floats(cfg), **other}
 
@@ -296,7 +328,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog = 'calc artic')
     parser.add_argument('-f', '--file', type=str, help='path to your engines (.mr)')
     parser.add_argument('-g', '--graphs', action='store_true', help='make graphs')
-    parser.add_argument('-r', '--common_r1', action='store_true', help='use single R1')
+    parser.add_argument('-r', '--common_r1', action='store_true', help='use single R1 in graph display')
     if os.name == 'nt':
         from ctypes import windll
         windll.shcore.SetProcessDpiAwareness(1)

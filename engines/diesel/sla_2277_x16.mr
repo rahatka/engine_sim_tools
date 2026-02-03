@@ -1,48 +1,58 @@
 // Engine Sim V0.1.14A
 // Sla 16
-// actual displacement: 36.718 L 2240.66 CI avg CR: 14.463
 // Created by oror 2024
 
-// calculating bank 2
-// stroke 161.269 mm Δstroke 1.269 mm
-// max S 399.468 mm at 139.3° Δσ 4.3° ΔS -0.532 mm
-// CR 14.022 opt L1 234.438 opt R1 87.446 opt ψ 136.276°
-// bank 135.000° avg-optimized ψ 140.09° artic TDC 145.182°
+// bank 2
+// stroke=165.671 mm Δstroke=5.671 mm
+// TDC at 137.201°, Δσ=2.201°, ΔTDC=-0.399 mm, CR=14.523
+// CR-optimal params: L1=232.979 or R1=86.979 or ψ=139.905°
+// bank 135.000°, avg-optimized ψ=140.09°, artic TDC=145.182°
+// ΔVolume=3.545%, ΔCR=0.160%
 
-// calculating bank 3
-// stroke 160.000 mm Δstroke 0.000 mm
-// max S 401.000 mm at 180.0° Δσ 0.0° ΔS 1.000 mm
-// CR 15.744 opt L1 233.000 opt R1 86.000 opt ψ 188.971°
-// bank 180.000° avg-optimized ψ 180.00° artic TDC 180.000°
+// bank 3
+// stroke=160.000 mm Δstroke=0.000 mm
+// TDC at 180.000°, Δσ=0.000°, ΔTDC=0.000 mm, CR=14.500
+// CR-optimal params: L1=233.000 or R1=87.000 or ψ=180.000°
+// bank 180.000°, avg-optimized ψ=180.00°, artic TDC=180.000°
+// ΔVolume=0.000%, ΔCR=0.000%
 
-// calculating bank 4
-// stroke 160.029 mm Δstroke 0.029 mm
-// max S 399.135 mm at -45.9° Δσ -0.9° ΔS -0.865 mm
-// CR 13.584 opt L1 234.861 opt R1 87.887 opt ψ 312.723°
-// bank 315.000° avg-optimized ψ 309.91° artic TDC 304.818°
+// bank 4
+// stroke=164.442 mm Δstroke=4.442 mm
+// TDC at 314.644°, Δσ=-0.356°, ΔTDC=-0.316 mm, CR=14.514
+// CR-optimal params: L1=232.987 or R1=86.987 or ψ=309.062°
+// bank 315.000°, avg-optimized ψ=309.91°, artic TDC=304.818°
+// ΔVolume=2.776%, ΔCR=0.099%
 
-// CR-optimal R1 avg 87.111
-// CR-optimal L1 avg 234.100
+// CR-optimal R1 avg 86.989
+// CR-optimal L1 avg 232.989
+
+// actual displacement: 37.223 L 2271.46 CI avg CR: 14.509
 
 /*
 {
   "artic_cfg": {
+    "chamber_volumes": [
+      169.646,
+      175.357,
+      169.646,
+      174.171
+    ],
     "comp_R1": [
-      87.446,
-      86.0,
-      87.887
+      86.979,
+      87.0,
+      86.987
     ],
     "comp_ign": [
-      4.3,
+      2.201,
       0.0,
-      -0.9
+      -0.356
     ],
     "cyl_per_bank": 4,
     "num_of_banks": 4,
     "psi": [
-      135.0,
+      140.0,
       180.0,
-      315.0
+      309.0
     ],
     "sigma": [
       135.0,
@@ -109,8 +119,11 @@ label bore(135.0)
 label stroke(160.0)
 label compression_ratio(14.5)
 label con_rod(320.0) // ~
-label L1(234.0) // ?
+label L1(233.0) // ?
 label R1(87.0)
+label psi0(-140.0 * units.deg)
+label psi1(-180.0 * units.deg)
+label psi2(-309.0 * units.deg)
 label compression_height(92.0 * units.mm)
 label intake_valve_diameter(65.0) // ?
 label exhaust_valve_diameter(61.0) // ?
@@ -404,6 +417,8 @@ exhaust_flow exhaust_flow()
 
 public node block_builder {
     input phase;
+    input cv0;
+    input cv1;
     input angle;
     input rods0;
     input rods1;
@@ -575,6 +590,7 @@ public node block_builder {
 
     _b0.set_cylinder_head(
         head(
+            chamber_volume: cv0,
             intake_camshaft: _intake_cam_0,
             exhaust_camshaft: _exhaust_cam_0,
             flip_display: flip_display
@@ -582,6 +598,7 @@ public node block_builder {
     )
     _b1.set_cylinder_head(
         head(
+            chamber_volume: cv1,
             intake_camshaft: _intake_cam_1,
             exhaust_camshaft: _exhaust_cam_1,
             flip_display: flip_display
@@ -608,13 +625,14 @@ public node head {
     // primary length: 65.4 cm, area: 24.6 cm², diameter: 5.6 cm
     // collector diameter: 13.2 cm, area: 137.7 cm²
 
+    input chamber_volume;
     input intake_camshaft;
     input exhaust_camshaft;
     input flip_display: false;
     
     alias output __out: head;
     generic_cylinder_head head(
-        chamber_volume: 169.646 * units.cc,
+        chamber_volume: chamber_volume * units.cc,
         intake_runner_volume: 425.5 * units.cc,
         intake_runner_cross_section_area: 20.4 * units.cm2,
         exhaust_runner_volume: 170.2 * units.cc,
@@ -763,9 +781,6 @@ public node rods {
     connecting_rod sr2_2(slave_rod_params)
     connecting_rod sr3_2(slave_rod_params)
 
-    label psi0(-135.0 * units.deg)
-    label psi1(-180.0 * units.deg)
-    label psi2(-315.0 * units.deg)
     rod_journal sj0_0(angle: psi0)
     rod_journal sj1_0(angle: psi0)
     rod_journal sj2_0(angle: psi0)
@@ -820,7 +835,9 @@ public node eng {
     rods r(c0)
 
     block_builder block0(
-        phase: 0,
+        phase: 0,        
+        cv0: 169.646, // 0
+        cv1: 169.646, // 180
         angle: vee / 2,
         rods0: r0(r),
         rods1: r2(r),
@@ -833,6 +850,8 @@ public node eng {
 
     block_builder block1(
         phase: vee,
+        cv0: 175.357, // 135
+        cv1: 174.171, // 315
         angle: -vee / 2,
         rods0: r1(r),
         rods1: r3(r),
@@ -846,10 +865,10 @@ public node eng {
     label collector_cross_section_area(68.8)
 
     label exhaust_pipe_length_0(200.0) // cm
-    label exhaust_volume_0(collector_cross_section_area * exhaust_pipe_length_0 / 100.0) // Litres
+    label exhaust_volume_0(collector_cross_section_area * exhaust_pipe_length_0 / 1000.0) // Litres
     
     label exhaust_pipe_length_1(200.0) // cm
-    label exhaust_volume_1(collector_cross_section_area * exhaust_pipe_length_1 / 100.0) // Litres
+    label exhaust_volume_1(collector_cross_section_area * exhaust_pipe_length_1 / 1000.0) // Litres
     
     label spacing_factor(1.1)
     label flange_density(1.2)

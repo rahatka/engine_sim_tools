@@ -25,6 +25,6 @@ def calculate_displacement(input_str):
     return displacement
 
 # Example usage
-input_str = "4 5/32,4 13/64,4"
+input_str = "4 7/8,6,4"
 disp = calculate_displacement(input_str)
 print(f"{disp:.1f}")

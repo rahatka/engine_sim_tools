@@ -28,6 +28,7 @@ cc_to_ci = np.float64(0.0610237441)
 ci_to_cc = np.float64(16.387064069264)
 si_to_cm2 = np.float64(6.451599929)
 quarter_pi = np.pi / 4.0
+ARTIC = False
 
 
 def draw_circle(ax, center, radius, color='blue', linestyle='-'):
@@ -121,6 +122,8 @@ def mm_to_inches_fraction(mm):
 
 
 def parse_cfg(fpath):
+    global ARTIC
+
     cfg = {
         "resolution": 32,
         "power_factor": 1.0,
@@ -157,7 +160,8 @@ def parse_cfg(fpath):
                 raw = s
                 conf = result["flow_cfg"]
                 other_config = {k: v for k, v in result.items() if k != "flow_cfg"}
-                break
+            if "artic_cfg" in result:
+                ARTIC = True
         except json.JSONDecodeError:
             continue
 
@@ -483,8 +487,10 @@ def port_flow(fpath):
     
     def save(val):
         nonlocal c, raw, cfg, other
+        global ARTIC
         chamber_vol_cc = c.cyl_volume_cc / (compression_ratio - 1)
         nacc = (bore / 25.4)**2 * number_of_cylinders / 2.5
+        chvol = f"{chamber_vol_cc:.3f}"
         head_flow = f"""{{
     // port_flow.py v{ver}
     // intake port area: {c.intake_port_area * number_of_intake_valves / 100:.1f} cm²; saturated lift: {c.intake_saturated_lift:.2f} mm
@@ -495,13 +501,14 @@ def port_flow(fpath):
     // primary length: {c.primary_length:.1f} cm, area: {c.primary_area:.1f} cm², diameter: {c.primary_diameter:.1f} cm
     // collector diameter: {c.collector_diameter:.1f} cm, area: {c.collector_area:.1f} cm²
 
+{"    input chamber_volume;" if ARTIC else ""}
     input intake_camshaft;
     input exhaust_camshaft;
     input flip_display: false;
     
     alias output __out: head;
     generic_cylinder_head head(
-        chamber_volume: {chamber_vol_cc:.3f} * units.cc,
+        chamber_volume: {"chamber_volume" if ARTIC else chvol} * units.cc,
         intake_runner_volume: {c.intake_runner_volume:.1f} * units.cc,
         intake_runner_cross_section_area: {c.runner_area:.1f} * units.cm2,
         exhaust_runner_volume: {c.exhaust_runner_volume:.1f} * units.cc,

@@ -97,8 +97,8 @@ def svj(R, L, rpm, offset=0):  # path, velocity, acceleration
     omega = rpm_to_rps(rpm)
     lam = R / L
 
-    alpha_deg = np.linspace(0, 360, 1000)  # High resolution
-    alpha = np.radians(alpha_deg)  # Convert to radians
+    alpha_deg = np.linspace(0, 360, 1000)
+    alpha = np.radians(alpha_deg)
 
     c = compute_k_rho(lam)
 
@@ -141,9 +141,11 @@ def graphs(S, V, J, rpm):
     plt.xlabel("Crank Angle (°)")
     plt.ylabel("Piston Position (mm)")
     plt.title("Piston Position $S_p$")
-    plt.xticks(np.arange(0, 361, 40))
+    plt.xticks(np.arange(0, 361, 30))
     plt.legend()
     plt.grid(True, color='gray', linestyle='--', linewidth=0.5)
+    plt.axvline(180, linestyle='--', linewidth=0.75)
+    plt.axhline(0,   linestyle='--', linewidth=0.75)
     plt.tight_layout()
 
     # Piston Speed Graph
@@ -154,9 +156,11 @@ def graphs(S, V, J, rpm):
     plt.xlabel("Crank Angle (°)")
     plt.ylabel("Piston Speed (m/s)")
     plt.title(f"Piston Speed $V_p$ at {rpm} RPM")
-    plt.xticks(np.arange(0, 361, 40))
+    plt.xticks(np.arange(0, 361, 30))
     plt.legend()
     plt.grid(True, color='gray', linestyle='--', linewidth=0.5)
+    plt.axvline(180, linestyle='--', linewidth=0.75)
+    plt.axhline(0,   linestyle='--', linewidth=0.75)
     plt.tight_layout()
 
     # Piston Acceleration Graph
@@ -167,9 +171,11 @@ def graphs(S, V, J, rpm):
     plt.xlabel("Crank Angle (°)")
     plt.ylabel("Piston Acceleration (m/s²)")
     plt.title(f"Piston Acceleration $J_p$ at {rpm} RPM")
-    plt.xticks(np.arange(0, 361, 40))
+    plt.xticks(np.arange(0, 361, 30))
     plt.legend()
     plt.grid(True, color='gray', linestyle='--', linewidth=0.5)
+    plt.axvline(180, linestyle='--', linewidth=0.75)
+    plt.axhline(0,   linestyle='--', linewidth=0.75)
     plt.tight_layout()
 
     plt.show()
