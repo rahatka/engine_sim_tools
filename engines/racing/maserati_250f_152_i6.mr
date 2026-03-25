@@ -46,7 +46,7 @@ constants constants()
     "max_power_rpm": 7500.0,
     "max_torque_rpm": 5500.0,
     "port_to_valve_area": 0.84,
-    "power_factor": 1.25,
+    "power_factor": 1.35,
     "primary_area_coeff": 1.05,
     "resolution": 32,
     "smoothness": 2.0,
@@ -97,6 +97,8 @@ label exhaust_duration(EVO + EVC + rot180)
 
 label ILC((rot180 - IVO + IVC) / 2.0 + rot360)
 label ELC((rot180 - EVO + EVC) / 2.0 + rot180)
+
+label con_rod_mass(350.0) // ? g
 
 label exhaust_delay_coeff(1.5)
 
@@ -391,8 +393,9 @@ public node head {
     // cylinder volume: 415.6 cm³ (25.36 CI); engine volume: 2.494 L (152.18 CI)
     // chamber volume: 36.1 cm³ (2.21 CI); conrod/stroke 1.907; N.A.C.C. 26.25
     // 8 harmonic intake runner length: 21.7 cm; diameter: 4.2 cm
-    // primary length: 14.9 cm, area: 10.5 cm², diameter: 3.7 cm
+    // primary length: 4.2 cm, area: 10.5 cm², diameter: 3.7 cm
     // collector diameter: 6.3 cm, area: 31.5 cm²
+
 
     input intake_camshaft;
     input exhaust_camshaft;
@@ -424,7 +427,7 @@ public node eng {
         starter_torque: 150 * units.Nm,
         starter_speed: 300 * units.rpm,
         redline: redline * units.rpm,
-        fuel: r50(),
+        fuel: m9b1(),
         throttle_gamma: 1.5,
         jitter: 1.0,
         noise: 0.2,
@@ -466,8 +469,11 @@ public node eng {
     )
 
     connecting_rod_parameters cr_params(
-        mass: 500.0 * units.g,
-        moment_of_inertia: 0.0015,
+        mass: con_rod_mass * units.g,
+        moment_of_inertia: rod_moment_of_inertia(
+            mass: con_rod_mass * units.g,
+            length: con_rod * units.mm
+        ),
         center_of_mass: 0.0,
         length: con_rod * units.mm
     )
@@ -484,30 +490,30 @@ public node eng {
     
     label spacing_factor(1.1)
     label flange_density(1.0 * exhaust_delay_coeff)
-    
 
     intake intake(
-        plenum_volume: 3.2 * units.L,
+        plenum_volume: 3.3 * units.L,
         plenum_cross_section_area: 41.7 * units.cm2,
         runner_length: 21.7 * units.cm,
-        intake_flow_rate: k_carb(374.1),
+        intake_flow_rate: k_carb(390.7),
         idle_flow_rate: k_carb(0.03),
         idle_throttle_plate_position: 0.9975,
-        runner_flow_rate: k_carb(140.3),
+        runner_flow_rate: k_carb(153.0),
         velocity_decay: 0.05
     )
     
     exhaust_system_parameters es_params0(
-        outlet_flow_rate: k_carb(662.4),
+        outlet_flow_rate: k_carb(708.1),
         collector_cross_section_area: 31.5 * units.cm2,
         length: exhaust_pipe_length_0 * units.cm,
-        primary_tube_length: 14.9 * units.cm,
-        primary_flow_rate: k_carb(234.6),
-        velocity_decay: 0.8,
+        primary_tube_length: 4.2 * units.cm,
+        primary_flow_rate: k_carb(256.7),
+        velocity_decay: 0.1,
+        audio_volume: 0.0005,
         volume: exhaust_volume_0 * units.L
     )
  
-    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_45.wav", volume: 0.001))
+    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_45.wav"))
  
     cylinder_bank b0(bank_params, angle: 0)
 

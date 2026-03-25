@@ -431,7 +431,8 @@ def port_flow(fpath):
 
         c.intake_runner_volume = c.runner_area * c.runner_length
         c.exhaust_runner_volume = c.intake_runner_volume / cfg["ir_to_er_ratio"]
-        c.primary_length = ((850 * (360 - evo) / cfg["max_power_rpm"]) - 3) / 2
+        c.primary_length = bore / 20
+        # c.primary_length = ((850 * (360 - evo) / cfg["max_power_rpm"]) - 3) / 2
         # c.primary_area = c.cyl_volume_cc * cc_to_ci * (cfg["max_torque_rpm"] * cfg["primary_area_coeff"]) / 88200 * si_to_cm2
         c.primary_area = c.exhaust_port_area * number_of_exhaust_valves * cfg["primary_area_coeff"] / 100
         c.primary_diameter =  np.sqrt(c.primary_area / np.pi) * 2
