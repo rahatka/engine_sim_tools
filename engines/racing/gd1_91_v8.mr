@@ -36,6 +36,7 @@ constants constants()
     "exhaust_flange_dia": null,
     "exhaust_port_dia": null,
     "exhaust_stem_dia": null,
+    "flow_mult": 1.0,
     "intake_port_dia": null,
     "intake_runner_dia_mult": 1.0,
     "intake_stem_dia": null,
@@ -43,7 +44,7 @@ constants constants()
     "max_power_rpm": 10000.0,
     "max_torque_rpm": 7500.0,
     "port_to_valve_area": 0.85,
-    "power_factor": 1.15,
+    "power_factor": 1.4,
     "primary_area_coeff": 1.1,
     "resolution": 32,
     "smoothness": 2.0,
@@ -398,14 +399,15 @@ private node add_flow_sample {
 }
 
 public node head {
-    // port_flow.py v1.7
+    // port_flow.py v1.8
     // intake port area: 7.3 cm²; saturated lift: 7.45 mm
     // exhaust port area: 5.7 cm²; saturated lift: 6.58 mm
     // cylinder volume: 187.2 cm³ (11.42 CI); engine volume: 1.497 L (91.38 CI)
     // chamber volume: 19.3 cm³ (1.18 CI); conrod/stroke 1.935; N.A.C.C. 19.07
     // 8 harmonic intake runner length: 14.4 cm; diameter: 3.3 cm
-    // primary length: 10.6 cm, area: 6.3 cm², diameter: 2.8 cm
+    // primary length: 3.1 cm, area: 6.3 cm², diameter: 2.8 cm
     // collector diameter: 6.7 cm, area: 35.2 cm²
+
 
     input intake_camshaft;
     input exhaust_camshaft;
@@ -467,8 +469,6 @@ public node eng {
         mass: crank_mass * units.kg,
         friction_torque: 2.2 * units.Nm,
         moment_of_inertia: crank_moment + flywheel_moment + other_moment,
-        position_x: 0.0,
-        position_y: 0.0,
         tdc: 0.0
     )
 
@@ -484,7 +484,7 @@ public node eng {
         .add_rod_journal(rj3)
 
     piston_parameters piston_params(
-        mass: 250.0 * units.g,
+        mass: 150.0 * units.g,
         blowby: k_28inH2O(0.019),
         compression_height: compression_height,
         wrist_pin_position: 0.0,
@@ -508,38 +508,40 @@ public node eng {
     label flange_density(3.0)
 
     intake intake0(
-        plenum_volume: 2.4 * units.L,
+        plenum_volume: 2.7 * units.L,
         plenum_cross_section_area: 33.4 * units.cm2,
         runner_length: 14.4 * units.cm,
-        intake_flow_rate: k_carb(308.5),
+        intake_flow_rate: k_carb(344.4),
         idle_flow_rate: k_carb(0.06),
         idle_throttle_plate_position: 0.9965,
-        runner_flow_rate: k_carb(82.9),
-        velocity_decay: 0.05
+        runner_flow_rate: k_carb(103.3),
+        velocity_decay: 0.01
     )
     
     exhaust_system_parameters es_params0(
-        outlet_flow_rate: k_carb(266.8),
+        outlet_flow_rate: k_carb(315.7),
         collector_cross_section_area: 17.6 * units.cm2,
         length: exhaust_pipe_length_0 * units.cm,
-        primary_tube_length: 10.6 * units.cm,
-        primary_flow_rate: k_carb(138.4),
-        velocity_decay: 0.5,
+        primary_tube_length: 13.1 * units.cm,
+        primary_flow_rate: k_carb(173.6),
+        velocity_decay: 0.1,
+        audio_volume: 0.0001,
         volume: exhaust_volume_0 * units.L
     )
     
     exhaust_system_parameters es_params1(
-        outlet_flow_rate: k_carb(266.8),
+        outlet_flow_rate: k_carb(315.7),
         collector_cross_section_area: 17.6 * units.cm2,
         length: exhaust_pipe_length_1 * units.cm,
-        primary_tube_length: 10.6 * units.cm,
-        primary_flow_rate: k_carb(138.4),
-        velocity_decay: 0.5,
+        primary_tube_length: 13.1 * units.cm,
+        primary_flow_rate: k_carb(173.6),
+        velocity_decay: 0.1,
+        audio_volume: 0.0001,
         volume: exhaust_volume_1 * units.L
     )
 
-    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_45.wav", volume: 0.001))
-    exhaust_system exhaust1(es_params1, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_58.wav", volume: 0.001))
+    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_45.wav"))
+    exhaust_system exhaust1(es_params1, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_58.wav"))
  
     cylinder_bank b0(bank_params, angle: vee / 2)
     cylinder_bank b1(bank_params, angle: -vee / 2)

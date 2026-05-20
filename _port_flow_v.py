@@ -4,7 +4,7 @@
 # https://cjclub.co.il/files/JEEP_4.0_PERFORMANCE_SPECS.pdf
 # cylinder head flow figures (cfm at 28inH2O)
 # all calculations are rough and approximate
-# (c) oror 2023-2025
+# (c) oror 2023-2026
 
 import os
 import argparse
@@ -21,7 +21,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.optimize import minimize_scalar
 from tkinter.filedialog import askopenfilename
 
-ver = "1.7"
+ver = "1.9"
 json_pattern = regex.compile(r'\{(?:[^{}]|(?R))*\}')
 
 cc_to_ci = np.float64(0.0610237441)
@@ -100,6 +100,7 @@ class Calc:
         self.exhaust_primary_flow_rate = 0.0  # exhaust primary flow rate CFM
         self.plenum_volume = 0.0  # intake plenum volume L
         self.blowby = 0.0  # piston blow-by
+        self.flow_mult = 0.0
 
 
 def mm_to_inches_fraction(mm):
@@ -141,6 +142,7 @@ def parse_cfg(fpath):
         "intake_port_dia": None,
         "exhaust_port_dia": None,
         "smoothness": 2.0,
+        "flow_mult": 1.0
     }
 
     comments = comment_parser.extract_comments(fpath, mime='text/x-c')
@@ -174,7 +176,7 @@ def parse_cfg(fpath):
     return raw, cfg, other_config
 
 
-def generate_flow(resolution, port_to_valve_ratio, head_dia, lift, saturated_l, num_valves, factor, linearity, smoothness) -> tuple[np.array, np.array]:
+def generate_flow(resolution, port_to_valve_ratio, head_dia, lift, saturated_l, num_valves, factor, linearity, smoothness, mult) -> tuple[np.array, np.array]:
     lifts = np.arange(lift / resolution, lift * 2, lift / resolution)[:resolution]
     curtains = head_dia * port_to_valve_ratio * np.pi * lifts
     coeffs = 1 + np.log(saturated_l / lifts) / linearity
@@ -196,7 +198,7 @@ def generate_flow(resolution, port_to_valve_ratio, head_dia, lift, saturated_l, 
     padded_flow_samples = np.append(padded_flow_samples, extrapolated_values)
     
     smooth_flow_samples_padded = gaussian_filter1d(padded_flow_samples, sigma=smoothness)
-    smooth_flow_samples = smooth_flow_samples_padded[pad_size:pad_size + len(flow_samples_with_zero)]
+    smooth_flow_samples = smooth_flow_samples_padded[pad_size:pad_size + len(flow_samples_with_zero)] * mult
     smooth_flow_samples[0] = 0
     
     # lifts = lifts / 25.4
@@ -301,30 +303,31 @@ def port_flow(fpath):
     allowed_pac = np.linspace(0.5, 1.5, 21)
     allowed_cac = np.linspace(0.1, 1.0, 19)
 
-    left_sliders = 0.75
-    ax_i_pf = plt.axes([left_sliders, 0.92, 0.2, 0.03])
-    slider_i_pf  = Slider(ax=ax_i_pf, label='flow rate mult', valmin=0.0, valmax=2.0, valstep=allowed_pf, valinit=cfg["power_factor"], color='skyblue')
+    ax_i_pf = plt.axes([0.75, 0.92, 0.2, 0.03])
+    slider_i_pf  = Slider(ax=ax_i_pf, label='power factor', valmin=0.0, valmax=2.0, valstep=allowed_pf, valinit=cfg["power_factor"], color='skyblue')
 
     if cfg["intake_port_dia"] is None or cfg["exhaust_port_dia"] is None:
-        ax_i_pva = plt.axes([left_sliders, 0.90, 0.2, 0.03])
+        ax_i_pva = plt.axes([0.75, 0.90, 0.2, 0.03])
         slider_i_pva = Slider(ax=ax_i_pva, label='port to valve area', valmin=0.6, valmax=1.0, valstep=allowed_pva, valinit=cfg["port_to_valve_area"], color='skyblue')
 
     if cfg["intake_stem_dia"] is None or cfg["exhaust_stem_dia"] is None:
-        ax_i_vsd = plt.axes([left_sliders, 0.88, 0.2, 0.03])
+        ax_i_vsd = plt.axes([0.75, 0.88, 0.2, 0.03])
         slider_i_vsd  = Slider(ax=ax_i_vsd, label='valve to stem dia', valmin=3.0, valmax=7.0, valstep=allowed_vsd, valinit=cfg["valve_to_stem_dia"], color='skyblue')
 
-    ax_i_irdm = plt.axes([left_sliders, 0.86, 0.2, 0.03])
-    slider_i_irdm  = Slider(ax=ax_i_irdm, label='intake runner dia mult', valmin=0.8, valmax=1.2, valstep=allowed_irdm, valinit=cfg["intake_runner_dia_mult"], color='skyblue')
-    ax_i_irerr = plt.axes([left_sliders, 0.84, 0.2, 0.03])
-    slider_i_irerr  = Slider(ax=ax_i_irerr, label='intake to exhaust runner ratio', valmin=1.0, valmax=5.0, valstep=allowed_irerr, valinit=cfg["ir_to_er_ratio"], color='skyblue')
-    ax_i_pac = plt.axes([left_sliders, 0.82, 0.2, 0.03])
-    slider_i_pac  = Slider(ax=ax_i_pac, label='primary area coeff', valmin=0.5, valmax=1.5, valstep=allowed_pac, valinit=cfg["primary_area_coeff"], color='skyblue')
-    ax_i_cac = plt.axes([left_sliders, 0.80, 0.2, 0.03])
-    slider_i_cac  = Slider(ax=ax_i_cac, label='collector area coeff', valmin=0.1, valmax=1.0, valstep=allowed_cac, valinit=cfg["collector_area_coeff"], color='skyblue')
-    ax_i_smooth = plt.axes([left_sliders, 0.78, 0.2, 0.03])
-    slider_i_smooth  = Slider(ax=ax_i_smooth, label='smoothness', valmin=1.0, valmax=5.0, valstep=allowed_smooth, valinit=cfg["smoothness"], color='skyblue')
+    ax_i_irdm = plt.axes([0.75, 0.86, 0.2, 0.03])
+    slider_i_irdm = Slider(ax=ax_i_irdm, label='intake runner dia mult', valmin=0.8, valmax=1.2, valstep=allowed_irdm, valinit=cfg["intake_runner_dia_mult"], color='skyblue')
+    ax_i_irerr = plt.axes([0.75, 0.84, 0.2, 0.03])
+    slider_i_irerr = Slider(ax=ax_i_irerr, label='intake to exhaust runner ratio', valmin=1.0, valmax=5.0, valstep=allowed_irerr, valinit=cfg["ir_to_er_ratio"], color='skyblue')
+    ax_i_pac = plt.axes([0.75, 0.82, 0.2, 0.03])
+    slider_i_pac = Slider(ax=ax_i_pac, label='primary area coeff', valmin=0.5, valmax=1.5, valstep=allowed_pac, valinit=cfg["primary_area_coeff"], color='skyblue')
+    ax_i_cac = plt.axes([0.75, 0.80, 0.2, 0.03])
+    slider_i_cac = Slider(ax=ax_i_cac, label='collector area coeff', valmin=0.1, valmax=1.0, valstep=allowed_cac, valinit=cfg["collector_area_coeff"], color='skyblue')
+    ax_i_smooth = plt.axes([0.75, 0.78, 0.2, 0.03])
+    slider_i_smooth = Slider(ax=ax_i_smooth, label='smoothness', valmin=1.0, valmax=5.0, valstep=allowed_smooth, valinit=cfg["smoothness"], color='skyblue')
+    ax_i_flow_mult = plt.axes([0.75, 0.76, 0.2, 0.03])
+    slider_i_flow_mult = Slider(ax=ax_i_flow_mult, label='flow mult', valmin=0.6, valmax=1.0, valstep=allowed_pva, valinit=cfg["flow_mult"], color='skyblue')
 
-    ax_save = fig.add_axes([left_sliders, 0.74, 0.12, 0.03])
+    ax_save = fig.add_axes([0.75, 0.70, 0.12, 0.03])
     button_save = Button(ax_save, 'save', color='black', hovercolor='skyblue')
 
     bore_area = quarter_pi * bore ** 2
@@ -451,9 +454,9 @@ def port_flow(fpath):
         intake_head_flow_factor = 7
         exhaust_head_flow_factor = 6
         c.int_l, c.int_f = generate_flow(resolution, port_to_valve_head_radius, intake_head_diameter,
-                                         intake_valve_lift, c.intake_saturated_lift, number_of_intake_valves, intake_head_flow_factor, 3, cfg['smoothness'])
+                                         intake_valve_lift, c.intake_saturated_lift, number_of_intake_valves, intake_head_flow_factor, 3, cfg['smoothness'], cfg['flow_mult'])
         c.exh_l, c.exh_f = generate_flow(resolution, port_to_valve_head_radius, exhaust_head_diameter,
-                                         exhaust_valve_lift, c.exhaust_saturated_lift, number_of_exhaust_valves, exhaust_head_flow_factor, 3, cfg['smoothness'])
+                                         exhaust_valve_lift, c.exhaust_saturated_lift, number_of_exhaust_valves, exhaust_head_flow_factor, 3, cfg['smoothness'], cfg['flow_mult'])
 
     def update_plot(val):
         nonlocal c
@@ -471,6 +474,7 @@ def port_flow(fpath):
         cfg["intake_runner_dia_mult"] = slider_i_irdm.val
         cfg["ir_to_er_ratio"] = slider_i_irerr.val
         cfg['smoothness'] = slider_i_smooth.val
+        cfg['flow_mult'] = slider_i_flow_mult.val
         cfg['primary_area_coeff'] = slider_i_pac.val
         cfg['collector_area_coeff'] = slider_i_cac.val
 
@@ -619,6 +623,7 @@ def port_flow(fpath):
     slider_i_irdm.on_changed(update_plot)
     slider_i_irerr.on_changed(update_plot)
     slider_i_smooth.on_changed(update_plot)
+    slider_i_flow_mult.on_changed(update_plot)
     slider_i_pac.on_changed(update_plot)
     slider_i_cac.on_changed(update_plot)
     button_save.on_clicked(save)

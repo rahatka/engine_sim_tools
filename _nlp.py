@@ -3,9 +3,9 @@ import numpy as np
 
 num_values = 16
 
-start_val = 20.0
-end_val = 175.0
-steepness_factor = 0.90
+start_val = 16.0
+end_val = 135.0
+steepness_factor = 0.83
 
 x_values = np.linspace(0, 1, num_values)
 values = start_val + (end_val - start_val) * np.power(x_values, steepness_factor)
