@@ -23,13 +23,18 @@
 /*
 {
   "artic_cfg": {
+    "chamber_volumes": [
+      415.689,
+      390.276,
+      390.276
+    ],
     "comp_R1": [
       59.354,
       59.354
     ],
     "comp_ign": [
-      -1.6,
-      1.6
+      -1.638,
+      1.638
     ],
     "cyl_per_bank": 4,
     "num_of_banks": 3,
@@ -79,6 +84,7 @@
     "exhaust_flange_dia": null,
     "exhaust_port_dia": 38.71,
     "exhaust_stem_dia": null,
+    "flow_mult": 1.0,
     "intake_port_dia": 38.1,
     "intake_runner_dia_mult": 1.04,
     "intake_stem_dia": 11.5,
@@ -131,7 +137,7 @@ label rot90(90.0 * units.deg)
 label rot180(180.0 * units.deg)
 label rot360(360.0 * units.deg)
 
-label redline(2750.0) // RPM
+label redline(2500.0) // RPM
 
 // Napier Lion (@0.020")
 label IVL(8.7376) // .344
@@ -149,7 +155,7 @@ label ELC((rot180 - EVO + EVC) / 2.0 + rot180)
 
 label con_rod_mass(1200.0) // ? g
 label crank_mass(40.0) // ? kg
-label flywheel_mass(12.0) // kg
+label flywheel_mass(20.0) // kg
 
 label exhaust_delay_coeff(1.5)
 
@@ -470,22 +476,23 @@ private node add_flow_sample {
 }
 
 public node head {
-    // port_flow.py v1.7
+    // port_flow.py v1.9
     // intake port area: 20.7 cm²; saturated lift: 8.66 mm
     // exhaust port area: 21.6 cm²; saturated lift: 8.89 mm
     // cylinder volume: 1995.3 cm³ (121.76 CI); engine volume: 23.944 L (1461.14 CI)
     // chamber volume: 415.7 cm³ (25.37 CI); conrod/stroke 1.917; N.A.C.C. 145.20
     // 32 harmonic intake runner length: 20.4 cm; diameter: 5.2 cm
-    // primary length: 58.8 cm, area: 21.6 cm², diameter: 5.2 cm
+    // primary length: 7.0 cm, area: 21.6 cm², diameter: 5.2 cm
     // collector diameter: 18.2 cm, area: 259.5 cm²
 
+    input chamber_volume;
     input intake_camshaft;
     input exhaust_camshaft;
     input flip_display: false;
     
     alias output __out: head;
     generic_cylinder_head head(
-        chamber_volume: 415.689 * units.cc,
+        chamber_volume: chamber_volume * units.cc,
         intake_runner_volume: 433.4 * units.cc,
         intake_runner_cross_section_area: 21.2 * units.cm2,
         exhaust_runner_volume: 166.7 * units.cc,
@@ -622,26 +629,27 @@ public node eng {
         plenum_volume: 7.5 * units.L,
         plenum_cross_section_area: 127.2 * units.cm2,
         runner_length: 20.4 * units.cm,
-        intake_flow_rate: k_carb(1042.5),
+        intake_flow_rate: k_carb(947.8),
         idle_flow_rate: k_carb(0.03),
         idle_throttle_plate_position: 0.997,
-        runner_flow_rate: k_carb(173.8),
+        runner_flow_rate: k_carb(158.0),
         velocity_decay: 0.05
     )
     
     exhaust_system_parameters es_params0(
-        outlet_flow_rate: k_carb(564.7),
+        outlet_flow_rate: k_carb(513.4),
         collector_cross_section_area: 86.5 * units.cm2,
         length: exhaust_pipe_length_0 * units.cm,
-        primary_tube_length: 58.8 * units.cm,
-        primary_flow_rate: k_carb(282.4),
-        velocity_decay: 0.75,
+        primary_tube_length: 7.0 * units.cm,
+        primary_flow_rate: k_carb(256.7),
+        velocity_decay: 0.1,
+        audio_volume: 0.0001,
         volume: exhaust_volume_0 * units.L
     )
 
-    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_45.wav", volume: 0.0015))
-    exhaust_system exhaust1(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_45.wav", volume: 0.0012))
-    exhaust_system exhaust2(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_52.wav", volume: 0.0010))
+    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_33.wav"))
+    exhaust_system exhaust1(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_33.wav"))
+    exhaust_system exhaust2(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_34.wav"))
 
     cylinder_bank b0(bank_params, angle: vee)
     cylinder_bank b1(bank_params, angle: 0 * units.deg)
@@ -777,6 +785,7 @@ public node eng {
 
     b0.set_cylinder_head (
         head(
+            chamber_volume: 390.276,
             intake_camshaft: camshaft.intake_cam_0,
             exhaust_camshaft: camshaft.exhaust_cam_0,
             flip_display: true
@@ -785,6 +794,7 @@ public node eng {
     
     b1.set_cylinder_head (
         head(
+            chamber_volume: 415.689,
             intake_camshaft: camshaft.intake_cam_1,
             exhaust_camshaft: camshaft.exhaust_cam_1
         )
@@ -792,31 +802,32 @@ public node eng {
     
     b2.set_cylinder_head (
         head(
+            chamber_volume: 390.276,
             intake_camshaft: camshaft.intake_cam_2,
             exhaust_camshaft: camshaft.exhaust_cam_2
         )
     )
 
-    function timing_curve(183.3 * units.rpm)
+    function timing_curve(166.7 * units.rpm)
     timing_curve
         .add_sample(0.0 * units.rpm, 4.0 * units.deg)
-        .add_sample(183.3 * units.rpm, 4.0 * units.deg)
-        .add_sample(366.7 * units.rpm, 4.0 * units.deg)
-        .add_sample(550.0 * units.rpm, 5.4 * units.deg)
-        .add_sample(733.3 * units.rpm, 7.1 * units.deg)
-        .add_sample(916.7 * units.rpm, 8.8 * units.deg)
-        .add_sample(1100.0 * units.rpm, 10.6 * units.deg)
-        .add_sample(1283.3 * units.rpm, 12.3 * units.deg)
-        .add_sample(1466.7 * units.rpm, 14.0 * units.deg)
-        .add_sample(1650.0 * units.rpm, 15.7 * units.deg)
-        .add_sample(1833.3 * units.rpm, 17.4 * units.deg)
-        .add_sample(2016.7 * units.rpm, 19.1 * units.deg)
-        .add_sample(2200.0 * units.rpm, 20.9 * units.deg)
-        .add_sample(2383.3 * units.rpm, 22.6 * units.deg)
-        .add_sample(2566.7 * units.rpm, 24.3 * units.deg)
-        .add_sample(2750.0 * units.rpm, 26.0 * units.deg)
-        .add_sample(2933.3 * units.rpm, -12.5 * units.deg)
-        .add_sample(3116.7 * units.rpm, -25.0 * units.deg)
+        .add_sample(166.7 * units.rpm, 4.0 * units.deg)
+        .add_sample(333.3 * units.rpm, 4.0 * units.deg)
+        .add_sample(500.0 * units.rpm, 5.0 * units.deg)
+        .add_sample(666.7 * units.rpm, 6.8 * units.deg)
+        .add_sample(833.3 * units.rpm, 8.5 * units.deg)
+        .add_sample(1000.0 * units.rpm, 10.3 * units.deg)
+        .add_sample(1166.7 * units.rpm, 12.0 * units.deg)
+        .add_sample(1333.3 * units.rpm, 13.8 * units.deg)
+        .add_sample(1500.0 * units.rpm, 15.5 * units.deg)
+        .add_sample(1666.7 * units.rpm, 17.3 * units.deg)
+        .add_sample(1833.3 * units.rpm, 19.0 * units.deg)
+        .add_sample(2000.0 * units.rpm, 20.8 * units.deg)
+        .add_sample(2166.7 * units.rpm, 22.5 * units.deg)
+        .add_sample(2333.3 * units.rpm, 24.3 * units.deg)
+        .add_sample(2500.0 * units.rpm, 26.0 * units.deg)
+        .add_sample(2666.7 * units.rpm, -12.5 * units.deg)
+        .add_sample(2833.3 * units.rpm, -25.0 * units.deg)
 
     engine.add_ignition_module(
         eng_distributor(
@@ -826,40 +837,37 @@ public node eng {
     )
 }
 
-// Pz V
+// Churchill VII & VIII
 public node veh {
     alias output __out: vehicle;
 
-    label car_mass(45000) // 45.0 t panther
+    label car_mass(41000)
 
     vehicle vehicle(
         mass: car_mass * units.kg,
-        drag_coefficient: 0.6,
-        cross_sectional_area: (2830 * units.mm) * (2680 * units.mm),
-        diff_ratio: 2.5 * 3,
-        tire_radius: (821.77 / 2) * units.mm,
-        rolling_resistance: 0.06 * car_mass * 9.81
+        drag_coefficient: 0.8,
+        cross_sectional_area: (3050 * units.mm) * (2440 * units.mm),
+        diff_ratio: 15.02,
+        tire_radius: (741.0 / 2) * units.mm,
+        rolling_resistance: 0.07 * car_mass * 9.81
         )
 }
 
-// Pz V
+// Churchill VII & VIII
 private node trn {
     alias output __out:
         transmission(
-            max_clutch_torque: 2500 * units.Nm,
-            max_clutch_flex: 15 * units.deg,
+            max_clutch_torque: 1500 * units.Nm,
+            max_clutch_flex: 8 * units.deg,
             limit_clutch_flex: true,
-            clutch_stiffness: 50 * units.Nm / units.deg,
-            clutch_damping: 1.0,
+            clutch_stiffness: 200 * units.Nm / units.deg,
+            clutch_damping: 2.5,
             simulate_flex: true
         )
-        .add_gear(10.8)  // 3.7 @ 2600
-        .add_gear(5.26)  // 7.6
-        .add_gear(3.33)  // 12.0
-        .add_gear(2.13)  // 18.8
-        .add_gear(1.48)  // 27.0
-        .add_gear(1.06)  // 37.7
-        .add_gear(0.85); // 47.3
+        .add_gear(8.003)
+        .add_gear(2.818)
+        .add_gear(1.582)
+        .add_gear(1.000);
 }
 
 run(
