@@ -47,6 +47,7 @@
     "exhaust_flange_dia": null,
     "exhaust_port_dia": null,
     "exhaust_stem_dia": null,
+    "flow_mult": 1.0,
     "intake_port_dia": null,
     "intake_runner_dia_mult": 1.04,
     "intake_stem_dia": null,
@@ -82,9 +83,9 @@ label vee(45.0 * units.deg)
 label bore(79.375) // 3 1/8
 label stroke(101.6) // 4
 label compression_ratio(5.3) // 5.6 in 1933 also 5.4 4.9 ; 6.0, 5.65 in 1934
-label con_rod(235.0)
+label con_rod(234.95) // 9 1/4
 
-label compression_height(40.0 * units.mm) // ~
+label compression_height(87.3125 / 2 * units.mm) // 3 7/16 l
 label intake_valve_diameter(36.7284) // 1932 1.446 ; 1934 1.510
 label exhaust_valve_diameter(36.8808) // 1.452 ; 1934 1.387
 label intake_valves(1.0)
@@ -114,7 +115,8 @@ label exhaust_duration(EVO + EVC + rot180)
 label ILC((rot180 - IVO + IVC) / 2.0 + rot360)
 label ELC((rot180 - EVO + EVC) / 2.0 + rot180)
 
-label con_rod_mass(750.0) //?  g
+label con_rod_mass(750.0) // 31.808
+label piston_mass(0.0) // 20.88
 label crank_mass(38.0) // ? kg
 label flywheel_mass(10.0) // kg
 
@@ -422,14 +424,15 @@ private node add_flow_sample {
 }
 
 public node head {
-    // port_flow.py v1.7
+    // port_flow.py v1.9
     // intake port area: 8.0 cm²; saturated lift: 7.77 mm
     // exhaust port area: 8.1 cm²; saturated lift: 7.80 mm
     // cylinder volume: 502.7 cm³ (30.68 CI); engine volume: 6.033 L (368.16 CI)
-    // chamber volume: 116.9 cm³ (7.13 CI); conrod/stroke 2.313; N.A.C.C. 46.88
+    // chamber volume: 116.9 cm³ (7.13 CI); conrod/stroke 2.312; N.A.C.C. 46.88
     // 16 harmonic intake runner length: 27.4 cm; diameter: 3.2 cm
-    // primary length: 38.6 cm, area: 8.9 cm², diameter: 3.4 cm
+    // primary length: 4.0 cm, area: 8.9 cm², diameter: 3.4 cm
     // collector diameter: 6.4 cm, area: 32.0 cm²
+
 
     input intake_camshaft;
     input exhaust_camshaft;
@@ -550,9 +553,9 @@ public node eng {
         outlet_flow_rate: k_carb(314.2),
         collector_cross_section_area: 16.0 * units.cm2,
         length: exhaust_pipe_length_0 * units.cm,
-        primary_tube_length: 5.6 * units.cm,
+        primary_tube_length: 4.0 * units.cm,
         primary_flow_rate: k_carb(104.7),
-        velocity_decay: 1.5,
+        velocity_decay: 0.8,
         audio_volume: 0.0005,
         volume: (exhaust_volume_0 + 8.0) * units.L
     )
@@ -561,15 +564,15 @@ public node eng {
         outlet_flow_rate: k_carb(314.2),
         collector_cross_section_area: 16.0 * units.cm2,
         length: exhaust_pipe_length_1 * units.cm,
-        primary_tube_length: 5.6 * units.cm,
+        primary_tube_length: 4.0 * units.cm,
         primary_flow_rate: k_carb(104.7),
-        velocity_decay: 1.5,
+        velocity_decay: 0.8,
         audio_volume: 0.0005,
         volume: (exhaust_volume_1 + 8.0) * units.L
     )
 
     exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_56.wav"))
-    exhaust_system exhaust1(es_params1, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_57.wav"))
+    exhaust_system exhaust1(es_params1, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_58.wav"))
  
     cylinder_bank b0(bank_params, angle: vee / 2)
     cylinder_bank b1(bank_params, angle: -vee / 2)
@@ -744,34 +747,7 @@ public node eng {
     )
 }
 
-// Cadillac V12 1932
-public node veh {
-    alias output __out: vehicle;
-    vehicle vehicle(
-        mass: 2812.0  * units.kg,
-        drag_coefficient: 0.48,
-        cross_sectional_area: (1890 * units.mm) * (1700 * units.mm),
-        diff_ratio: 4.60, // 4.60 high, 4.80 low
-        tire_radius: (837.0 / 2) * units.mm, // 7.00x19
-        rolling_resistance: 20
-        )
-}
-
-// Cadillac V12 1932
-private node trn {
-    alias output __out:
-        transmission(
-            max_clutch_torque: 500 * units.Nm,
-            max_clutch_flex: 10 * units.deg,
-            limit_clutch_flex: true,
-            clutch_stiffness: 20 * units.Nm / units.deg,
-            clutch_damping: 2.0,
-            simulate_flex: true
-        )
-        .add_gear(2.40)
-        .add_gear(1.47)
-        .add_gear(1.0);
-}
+import "../../chassis/30s/cadillac_370.mr"
 
 run(
     engine: eng(),

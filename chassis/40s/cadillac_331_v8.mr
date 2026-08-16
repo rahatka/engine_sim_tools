@@ -1,0 +1,56 @@
+import "engine_sim.mr"
+
+units units()
+
+// 1949 Cadillac Series 62 Touring Sedan — 331 cu in V8
+public node veh {
+    alias output __out: vehicle;
+
+    // Estimated curb weight: approximately 4120 lb / 1870 kg
+    label car_mass(1870.0)
+
+    vehicle vehicle(
+        mass: car_mass * units.kg,
+
+        // Approximation for the rounded but tall 1949 body.
+        drag_coefficient: 0.50,
+
+        // Overall width × height:
+        // 78.9 in × 67.4 in
+        cross_sectional_area:
+            (2004 * units.mm) * (1712 * units.mm),
+
+        // Standard Cadillac final-drive ratio
+        diff_ratio: 3.77,
+
+        // Factory-style 8.20-15 bias-ply tyre.
+        // Representative diameter: 29.59 in / 751.6 mm
+        tire_radius: (751.6 / 2) * units.mm,
+
+        // Period bias-ply tyre and drivetrain losses
+        rolling_resistance: 0.016 * car_mass * 9.81
+    )
+}
+
+
+// 1949 Cadillac Hydra-Matic
+public node trn {
+    alias output __out:
+        transmission(
+            // Stock engine torque was approximately 423 Nm.
+            // Extra capacity avoids unintended clutch slip.
+            max_clutch_torque: 450 * units.Nm,
+
+            // Slightly softer settings to approximate
+            // the Hydra-Matic's fluid coupling.
+            max_clutch_flex: 12 * units.deg,
+            limit_clutch_flex: true,
+            clutch_stiffness: 18 * units.Nm / units.deg,
+            clutch_damping: 2.0,
+            simulate_flex: true
+        )
+        .add_gear(2.39)
+        .add_gear(1.53)
+        .add_gear(1.00);
+}
+

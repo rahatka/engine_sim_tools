@@ -3,6 +3,15 @@
 // Created by oror 2023
 // 1-8-5-10-3-7-6-11-2-9-4-12 :: 1-12-5-8-3-10-6-7-2-11-4-9
 
+// Lincoln-Zephyr
+// Zephyr Coupe-Sedan — 1936–1939
+// Zephyr Sedan — 1936–1939
+// Zephyr Coupe — 1937–1939
+// Zephyr Convertible Coupe — 1938–1939
+// Zephyr Convertible Sedan — 1938–1939
+
+// 1939 Lincoln Zephyr Touring L.A. Noire
+
 /*
 {
   "cam_cfg": {
@@ -84,6 +93,7 @@ label intake_valve_diameter(39.0398) // 1.537
 label exhaust_valve_diameter(39.0398) // 1.537
 label intake_valves(1.0)
 label exhaust_valves(1.0)
+label offset(6.35) // 1/4
 
 label cyl(12.0)
 label row(2.0)
@@ -96,7 +106,6 @@ label rot360(360.0 * units.deg)
 label cyl_base(cyl / row)
 label rot_base(cycle / cyl_base)
 
-label volume(4.380) // L;
 label redline(4250.0) // RPM
 
 // 1936 Zephyr
@@ -383,6 +392,8 @@ public node bank_builder {
     input intake;
     input exhaust;
     input sh;
+    input shift_x;
+    input shift_y;
     input flip: false;
 
     output bank: _b0;
@@ -430,7 +441,7 @@ public node bank_builder {
     ignition.connect_wire(_wire5, rot_base * var.s5 + phasing)
     ignition.connect_wire(_wire6, rot_base * var.s6 + phasing)
 
-    cylinder_bank _b0(bank_params, angle: incline)
+    cylinder_bank _b0(bank_params, angle: incline, position_x: shift_x, position_y: shift_y)
 
     label spacing_factor(1.15)
     label flange_density(1.0 * exhaust_delay_coeff)
@@ -598,9 +609,9 @@ public node eng {
         redline: redline * units.rpm,
         fuel: s30(),
         throttle_gamma: 1.5,
-        jitter: 0.3,
+        jitter: 0.7,
         noise: 0.5,
-        hf_gain: 0.002,
+        hf_gain: 0.003,
         simulation_frequency: 8000,
         dyno_min_speed: 500 * units.rpm
     )
@@ -623,6 +634,8 @@ public node eng {
         intake: intake,
         exhaust: exhaust0,
         sh: 0,
+        shift_x: 5.038 * units.mm, // 6.35 × (cos(37.5))
+        shift_y: 3.866 * units.mm, // 6.35 × (sin(37.5))
         flip: true
     )
 
@@ -634,6 +647,8 @@ public node eng {
         ignition: ignition,
         intake: intake,
         exhaust: exhaust0,
+        shift_x: 5.038 * units.mm, // 6.35 × (cos(37.5))
+        shift_y: -3.866 * units.mm, // 6.35 × (sin(37.5))
         sh: sh
     )
 
@@ -667,7 +682,7 @@ public node eng {
         volume: (exhaust_volume_0 + 10.0) * units.L
     )
 
-    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_33.wav"))
+    exhaust_system exhaust0(es_params0, impulse_response: impulse_response(filename: "../../impulse_responses/smooth_60.wav"))
     
     label sh((75.0 / flange_density) * units.cm)
 
@@ -699,34 +714,8 @@ public node eng {
         .add_ignition_module(ignition)
 }
 
-// 1936 Zephyr
-public node veh {
-    alias output __out: vehicle;
-    vehicle vehicle(
-        mass: 1520 * units.kg,
-        drag_coefficient: 0.45,
-        cross_sectional_area: (1854 * units.mm) * (1753 * units.mm),
-        diff_ratio: 3.0,
-        tire_radius: (673.0 / 2) * units.mm,
-        rolling_resistance: 20
-        )
-}
 
-// 1936 Zephyr
-private node trn {
-    alias output __out:
-        transmission(
-            max_clutch_torque: 300 * units.Nm,
-            max_clutch_flex: 30 * units.deg,
-            limit_clutch_flex: true,
-            clutch_stiffness: 20 * units.Nm / units.deg,
-            clutch_damping: 1.0,
-            simulate_flex: true
-        )
-        .add_gear(2.86)
-        .add_gear(1.68)
-        .add_gear(1.0);
-}
+import "../../chassis/30s/lincoln_267_v12.mr"
 
 run(
     engine: eng(),

@@ -21,9 +21,19 @@ YEAR_RE = re.compile(r"\b(18\d{2}|19\d{2}|20\d{2})\b")
 
 # Example:
 # // lobes.py v1.0 | 202.3 248.3 LSA 113.97 ADV -1.28 OVL -2.6
-LOBE_SUMMARY_RE = re.compile(
-    r"lobes\.py.*?\|\s*([-+]?\d+(?:\.\d+)?)\s+([-+]?\d+(?:\.\d+)?)\s+LSA\s+([-+]?\d+(?:\.\d+)?)\s+ADV\s+([-+]?\d+(?:\.\d+)?)",
+LOBE_SUMMARY_PIPE_RE = re.compile(
+    r"lobes\.py.*?\|\s*([-+]?\d+(?:\.\d+)?)\s+([-+]?\d+(?:\.\d+)?)\s+LSA\s*:?\s*([-+]?\d+(?:\.\d+)?)\s*,?\s*ADV\s*:?\s*([-+]?\d+(?:\.\d+)?)",
     re.IGNORECASE,
+)
+
+# Newer lobes.py output, often split across comment lines:
+# // ID: 200.0 ED: 207.0 LSA: 116.50, ADV: 2.00
+LOBE_SUMMARY_NAMED_RE = re.compile(
+    r"\bID\s*:\s*([-+]?\d+(?:\.\d+)?)"
+    r".*?\bED\s*:\s*([-+]?\d+(?:\.\d+)?)"
+    r".*?\bLSA\s*:\s*([-+]?\d+(?:\.\d+)?)"
+    r"\s*,?\s*\bADV\s*:\s*([-+]?\d+(?:\.\d+)?)",
+    re.IGNORECASE | re.DOTALL,
 )
 
 LEADING_NUM_RE = re.compile(r"^\s*([-+]?\d+(?:\.\d+)?)\b")
@@ -55,53 +65,29 @@ def expr_leading_number(expr: Optional[str]) -> Optional[float]:
     return safe_float(m.group(1))
 
 
-def parse_year_and_engine_name(text: str, file_stem: str) -> Tuple[Optional[int], str]:
-    """
-    Tries to parse a comment line like:
-      // 1914 Buick C-54, 55 48 @
-    Returns (year, engine_name)
-    """
-    header_lines = [m.group(1).strip() for m in HEADER_LINE_RE.finditer(text)]
-
-    # Prefer a comment line with a year (skip generic banner lines)
-    for line in header_lines:
-        low = line.lower()
-        if low.startswith("engine sim"):
-            continue
-        ym = YEAR_RE.search(line)
-        if ym:
-            year = int(ym.group(1))
-            engine_name = re.sub(rf"^\s*{year}\s*", "", line).strip()
-            engine_name = engine_name.strip("-–— ").strip()
-            if engine_name:
-                return year, engine_name
-
-    # Fallback: any year in comments + filename
-    for line in header_lines:
-        ym = YEAR_RE.search(line)
-        if ym:
-            return int(ym.group(1)), file_stem.replace("_", " ")
-
-    return None, file_stem.replace("_", " ")
-
-
 def parse_lobe_summary(text: str) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
-    m = LOBE_SUMMARY_RE.search(text)
-    if not m:
-        return None, None, None, None
-    return (
-        safe_float(m.group(1)),  # intake duration
-        safe_float(m.group(2)),  # exhaust duration
-        safe_float(m.group(3)),  # LSA
-        safe_float(m.group(4)),  # advance
-    )
+    for pattern in (LOBE_SUMMARY_PIPE_RE, LOBE_SUMMARY_NAMED_RE):
+        m = pattern.search(text)
+        if m:
+            return (
+                safe_float(m.group(1)),  # intake duration
+                safe_float(m.group(2)),  # exhaust duration
+                safe_float(m.group(3)),  # LSA
+                safe_float(m.group(4)),  # advance
+            )
+    return None, None, None, None
 
 
-def compute_duration_from_labels(labels: Dict[str, str]) -> Tuple[Optional[float], Optional[float]]:
-    """
-    Fallback if lobes.py summary is absent:
-      intake_duration = 180 + IVO + IVC
-      exhaust_duration = 180 + EVO + EVC
+def compute_cam_metrics_from_labels(
+    labels: Dict[str, str],
+) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+    """Compute durations, LSA and cam advance from valve timing events.
+
+    Timing convention used by these engine files:
+      IVO: degrees BTDC, IVC: degrees ABDC
+      EVO: degrees BBDC, EVC: degrees ATDC
+
+    Negative values naturally represent events on the opposite side of TDC/BDC.
     """
     ivo = expr_leading_number(labels.get("IVO"))
     ivc = expr_leading_number(labels.get("IVC"))
@@ -110,26 +96,35 @@ def compute_duration_from_labels(labels: Dict[str, str]) -> Tuple[Optional[float
 
     intake_duration = None
     exhaust_duration = None
+    intake_centerline = None
+    exhaust_centerline = None
 
     if ivo is not None and ivc is not None:
         intake_duration = 180.0 + ivo + ivc
+        intake_centerline = intake_duration / 2.0 - ivo
+
     if evo is not None and evc is not None:
         exhaust_duration = 180.0 + evo + evc
+        exhaust_centerline = exhaust_duration / 2.0 - evc
 
-    return intake_duration, exhaust_duration
+    lsa = None
+    advance = None
+    if intake_centerline is not None and exhaust_centerline is not None:
+        lsa = (intake_centerline + exhaust_centerline) / 2.0
+        advance = lsa - intake_centerline
+
+    return intake_duration, exhaust_duration, lsa, advance
 
 
-def displacement_cc(bore_mm: Optional[float], stroke_mm: Optional[float], cyl: Optional[float]) -> Optional[float]:
+def displacement_liters(bore_mm: Optional[float], stroke_mm: Optional[float], cyl: Optional[float]) -> Optional[float]:
     if bore_mm is None or stroke_mm is None or cyl is None:
         return None
-    # mm^3 -> cm^3
-    return (math.pi / 4.0) * (bore_mm ** 2) * stroke_mm * cyl / 1000.0
+    # mm^3 -> liters
+    return (math.pi / 4.0) * (bore_mm ** 2) * stroke_mm * cyl / 1_000_000.0
 
 
 def parse_engine_file(text: str, rel_path: str) -> Dict[str, object]:
-    file_stem = Path(rel_path).stem
     labels = parse_labels(text)
-    year, engine_name = parse_year_and_engine_name(text, file_stem)
 
     # Core labels
     bore = expr_leading_number(labels.get("bore"))
@@ -149,24 +144,29 @@ def parse_engine_file(text: str, rel_path: str) -> Dict[str, object]:
     # Preferred source for duration/LSA/ADV
     intake_duration, exhaust_duration, lsa, advance = parse_lobe_summary(text)
 
-    # Fallback durations from timing labels
-    if intake_duration is None or exhaust_duration is None:
-        d_i, d_e = compute_duration_from_labels(labels)
+    # Fallback from valve timing labels. This also fills LSA/advance when
+    # the file has no lobes.py summary comment.
+    if any(v is None for v in (intake_duration, exhaust_duration, lsa, advance)):
+        d_i, d_e, computed_lsa, computed_advance = compute_cam_metrics_from_labels(labels)
         if intake_duration is None:
             intake_duration = d_i
         if exhaust_duration is None:
             exhaust_duration = d_e
+        if lsa is None:
+            lsa = computed_lsa
+        if advance is None:
+            advance = computed_advance
 
-    disp = displacement_cc(bore, stroke, cyl)
+    disp = displacement_liters(bore, stroke, cyl)
     rod_ratio = (con_rod / stroke) if (con_rod is not None and stroke not in (None, 0)) else None
 
     return {
-        "year": year,
-        "engine_name": engine_name,
+        "source_file": rel_path,
         "cylinders": int(cyl) if cyl is not None and float(cyl).is_integer() else cyl,
         "bore_mm": bore,
         "stroke_mm": stroke,
-        "displacement_cm3": disp,
+        "displacement_l": disp,
+        "displacement_cyl_l": disp / int(cyl) if cyl is not None and float(cyl).is_integer() else cyl,
         "compression_ratio": compression_ratio,
         "con_rod_length_mm": con_rod,
         "con_rod_to_stroke_ratio": rod_ratio,
@@ -178,7 +178,6 @@ def parse_engine_file(text: str, rel_path: str) -> Dict[str, object]:
         "exhaust_duration_deg": exhaust_duration,
         "LSA_deg": lsa,
         "advance_deg": advance,
-        "source_file": rel_path,
     }
 
 
@@ -223,16 +222,16 @@ def collect_from_directory(root: Path) -> Dict[str, List[Tuple[str, str]]]:
     return out
 
 
-def write_section_csvs(section_map: Dict[str, List[Tuple[str, str]]], out_dir: Path) -> None:
-    out_dir.mkdir(parents=True, exist_ok=True)
+def write_combined_csv(section_map: Dict[str, List[Tuple[str, str]]], out_csv: Path) -> None:
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
 
     fieldnames = [
-        "year",
-        "engine_name",
+        "source_file",
         "cylinders",
         "bore_mm",
         "stroke_mm",
-        "displacement_cm3",
+        "displacement_l",
+        "displacement_cyl_l",
         "compression_ratio",
         "con_rod_length_mm",
         "con_rod_to_stroke_ratio",
@@ -244,42 +243,33 @@ def write_section_csvs(section_map: Dict[str, List[Tuple[str, str]]], out_dir: P
         "exhaust_duration_deg",
         "LSA_deg",
         "advance_deg",
-        "source_file",
     ]
 
-    for section in sorted(section_map.keys()):
-        rows: List[Dict[str, object]] = []
+    rows: List[Dict[str, object]] = []
 
+    for section in sorted(section_map.keys()):
         for rel_path, text in section_map[section]:
             try:
                 row = parse_engine_file(text, rel_path)
             except Exception as e:
                 print(f"[WARN] Failed parsing {rel_path}: {e}", file=sys.stderr)
-                row = {
-                    "year": None,
-                    "engine_name": Path(rel_path).stem.replace("_", " "),
-                    "source_file": rel_path,
-                }
+                row = {"source_file": rel_path}
             rows.append(row)
 
-        rows.sort(key=lambda r: (
-            9999 if r.get("year") in (None, "") else int(r["year"]),
-            str(r.get("engine_name", "")).lower()
-        ))
+    rows.sort(key=lambda r: str(r.get("source_file", "")).lower())
 
-        out_csv = out_dir / f"{section}.csv"
-        with out_csv.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            for r in rows:
-                writer.writerow({k: fmt(r.get(k)) for k in fieldnames})
+    with out_csv.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({k: fmt(r.get(k)) for k in fieldnames})
 
-        print(f"Wrote {out_csv} ({len(rows)} rows)")
+    print(f"Wrote {out_csv} ({len(rows)} rows)")
 
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Extract engine metadata from .mr files into per-section CSVs."
+        description="Extract engine metadata from .mr files into one combined CSV."
     )
     ap.add_argument(
         "engines_dir",
@@ -287,8 +277,8 @@ def main():
     )
     ap.add_argument(
         "-o", "--out",
-        default="engine_csv_out",
-        help="Output directory for CSV files (one per section folder)",
+        default="engines_combined.csv",
+        help="Output CSV file path",
     )
     args = ap.parse_args()
 
@@ -302,7 +292,7 @@ def main():
         print("No .mr engine files found.", file=sys.stderr)
         sys.exit(1)
 
-    write_section_csvs(section_map, Path(args.out))
+    write_combined_csv(section_map, Path(args.out))
 
 
 if __name__ == "__main__":

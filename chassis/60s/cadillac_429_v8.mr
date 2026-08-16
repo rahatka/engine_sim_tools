@@ -1,0 +1,50 @@
+import "engine_sim.mr"
+
+units units()
+
+// Cadillac Sedan de Ville 1964 — 429 cu in V8
+public node veh {
+    alias output __out: vehicle;
+
+    // Period Motor Trend test car: 5050 lb ≈ 2290 kg
+    label car_mass(2290.0)
+
+    vehicle vehicle(
+        mass: car_mass * units.kg,
+
+        // Estimated aerodynamic value.
+        // 2024 x 1433 mm is the car's bounding rectangle,
+        // so Cd is adjusted to give a realistic effective drag area.
+        drag_coefficient: 0.45,
+        cross_sectional_area:
+            (2024 * units.mm) * (1433 * units.mm),
+
+        // 3.21 with air conditioning.
+        // Use 2.94 for the standard non-A/C axle.
+        diff_ratio: 3.21,
+
+        // 8.20-15 bias-ply tyre:
+        // approximately 29.59 in / 751.6 mm overall diameter
+        tire_radius: (751.6 / 2) * units.mm,
+
+        // Slightly higher resistance for large period bias-ply tyres
+        rolling_resistance: 0.015 * car_mass * 9.81
+    )
+}
+
+// Cadillac Turbo Hydra-Matic — 3-speed automatic
+public node trn {
+    alias output __out:
+        transmission(
+            max_clutch_torque: 690 * units.Nm,
+            max_clutch_flex: 10 * units.deg,
+            limit_clutch_flex: true,
+            clutch_stiffness: 20 * units.Nm / units.deg,
+            clutch_damping: 2.0,
+            simulate_flex: true
+        )
+        .add_gear(2.48)
+        .add_gear(1.48)
+        .add_gear(1.00);
+}
+
